@@ -53,6 +53,7 @@ const en = {
     'This task changed after completion. Open Tasks to see its current status.',
   undoDone: 'Completion undone.',
   sessionProgress: '{actual} of {expected} focus sessions',
+  actualSessions: 'Focus sessions: {actual}',
   sessionTarget: 'Expected focus sessions: {expected}',
 };
 const ar: typeof en = {
@@ -110,6 +111,7 @@ const ar: typeof en = {
     'تغيّرت هذه المهمة بعد إكمالها. افتح صفحة المهام للاطّلاع على حالتها الحالية.',
   undoDone: 'تم التراجع عن إكمال المهمة.',
   sessionProgress: '{actual} من {expected} جلسات تركيز',
+  actualSessions: 'جلسات التركيز: {actual}',
   sessionTarget: 'جلسات التركيز المتوقعة: {expected}',
 };
 export const taskMessages = { en, ar };

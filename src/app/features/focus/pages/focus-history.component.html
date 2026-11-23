@@ -1,0 +1,223 @@
+<section class="task-list max-w-lg px-5 py-4" aria-labelledby="focus-goal">
+  <h2 id="focus-goal" class="text-lg font-semibold">{{ text().goalTitle }}</h2>
+  @if (history.status() === 'loading') {
+    <p class="text-muted" role="status">{{ text().loading }}</p>
+  }
+  @if (counts(); as today) {
+    <dl class="my-2 flex flex-wrap gap-x-6 gap-y-2">
+      <div>
+        <dt class="text-sm text-muted">{{ text().focusTime }}</dt>
+        <dd class="font-semibold">{{ duration(today.seconds) }}</dd>
+      </div>
+      @if (goalReady()) {
+        <div>
+          <dt class="text-sm text-muted">{{ text().sessions }}</dt>
+          <dd class="font-semibold">
+            {{
+              text()
+                .of.replace('{count}', number(today.count))
+                .replace('{goal}', number(goal()))
+            }}
+          </dd>
+        </div>
+      }
+    </dl>
+    @if (goalReady()) {
+      <progress
+        class="block w-full"
+        aria-labelledby="focus-goal"
+        [value]="today.count > goal() ? goal() : today.count"
+        [max]="goal()"
+      ></progress>
+      <p class="mt-1 text-sm text-muted" role="status">
+        {{
+          today.count >= goal()
+            ? text().goalReached
+            : text().remaining.replace('{count}', number(goal() - today.count))
+        }}
+      </p>
+    }
+  }
+  @if (goalReady()) {
+    <form
+      class="mt-3 flex flex-wrap items-end gap-2"
+      novalidate
+      (submit)="saveGoal($event, goalField)"
+    >
+      <div class="task-field max-w-full">
+        <label for="daily-focus-goal">{{ text().dailyTarget }}</label>
+        <input
+          #goalField
+          id="daily-focus-goal"
+          type="number"
+          min="1"
+          step="1"
+          class="w-32 max-w-full"
+          [value]="goal()"
+          [attr.aria-invalid]="goalFeedback() === 'invalidGoal'"
+          [attr.aria-describedby]="
+            goalFeedback() === 'invalidGoal' ? 'daily-focus-error' : null
+          "
+          (input)="goalFeedback.set(null)"
+        />
+      </div>
+      <button class="task-button" type="submit" [attr.aria-disabled]="saving()">
+        {{ text().saveGoal }}
+      </button>
+    </form>
+    @if (goalFeedback(); as feedback) {
+      @if (feedback === 'goalSaved') {
+        <p class="mt-2 text-sm text-muted" role="status">
+          {{ text()[feedback] }}
+        </p>
+      } @else {
+        <p id="daily-focus-error" class="mt-2 task-error" role="alert">
+          {{ text()[feedback] }}
+        </p>
+      }
+    }
+  }
+</section>
+
+<section class="task-list mt-6" aria-labelledby="focus-history">
+  <header class="flex flex-wrap items-end justify-between gap-3 px-5 py-4">
+    <h2 id="focus-history" class="text-lg font-semibold">
+      {{ text().history }}
+    </h2>
+    <div class="flex max-w-full flex-wrap items-end gap-2">
+      <div class="task-field max-w-full">
+        <label for="focus-history-date">{{ text().filterDate }}</label>
+        <input
+          #dateFilter
+          id="focus-history-date"
+          type="date"
+          class="max-w-full"
+          [value]="date() ?? ''"
+          (change)="filterDate(dateFilter.value)"
+        />
+      </div>
+      <button
+        type="button"
+        class="task-button"
+        [attr.aria-disabled]="!date()"
+        (click)="filterDate('')"
+      >
+        {{ text().allDates }}
+      </button>
+    </div>
+  </header>
+  @if (deleted()) {
+    <p class="px-5 pb-3 text-sm text-muted" role="status">
+      {{ text().deleted }}
+    </p>
+  }
+  @if (history.status() === 'loading') {
+    <p class="px-5 pb-4 text-muted" role="status">{{ text().loading }}</p>
+  } @else if (history.status() === 'error') {
+    <p class="px-5 pb-2 task-error" role="alert">{{ text().readError }}</p>
+    <button
+      type="button"
+      class="task-button mx-5 mb-4"
+      (click)="history.retry()"
+    >
+      {{ text().retryHistory }}
+    </button>
+  } @else if (rows().length === 0) {
+    <p class="px-5 pb-4 text-muted">
+      {{ date() ? text().emptyDate : text().empty }}
+    </p>
+  } @else {
+    <ul class="m-0 list-none p-0">
+      @for (row of rows(); track row.id) {
+        <li class="task-row flex-wrap">
+          <div class="min-w-0 flex-1">
+            <p class="font-semibold">
+              {{
+                row.type === 'timer' ? modeLabel().mode : modeLabel().stopwatch
+              }}
+            </p>
+            @if (row.taskTitleSnapshot; as title) {
+              <p class="break-words">
+                <bdi>{{ title }}</bdi>
+              </p>
+            }
+            <p class="text-sm" [class.font-semibold]="row.status === 'partial'">
+              {{ row.status === 'partial' ? text().partial : text().complete }}
+            </p>
+            <dl
+              class="mt-2 grid grid-cols-1 gap-x-4 gap-y-1 text-sm sm:grid-cols-2"
+            >
+              <div>
+                <dt class="text-muted">{{ text().started }}</dt>
+                <dd>
+                  <time [attr.datetime]="row.startedAt">{{
+                    timestamp(row.startedAt)
+                  }}</time>
+                </dd>
+              </div>
+              <div>
+                <dt class="text-muted">{{ text().ended }}</dt>
+                <dd>
+                  <time [attr.datetime]="row.endedAt">{{
+                    recordedEnd(row)
+                  }}</time>
+                </dd>
+              </div>
+              @if (row.plannedDurationSeconds !== null) {
+                <div>
+                  <dt class="text-muted">{{ text().planned }}</dt>
+                  <dd>{{ duration(row.plannedDurationSeconds) }}</dd>
+                </div>
+              }
+              <div>
+                <dt class="text-muted">{{ text().actual }}</dt>
+                <dd>{{ duration(row.actualDurationSeconds) }}</dd>
+              </div>
+            </dl>
+          </div>
+          <button
+            #trigger
+            type="button"
+            class="task-button"
+            (click)="openRemove(row, trigger)"
+            [attr.aria-label]="text().remove + ' · ' + recordedEnd(row)"
+          >
+            {{ text().remove }}
+          </button>
+        </li>
+      }
+    </ul>
+  }
+</section>
+
+<app-dialog
+  #confirm
+  [heading]="text().confirm"
+  [closeLabel]="locale.text().close"
+  [busy]="deleting()"
+  (closed)="closed()"
+>
+  <p class="mb-4">{{ text().deleteDescription }}</p>
+  @if (deleteError()) {
+    <p role="alert" class="mb-4 task-error">{{ text().deleteError }}</p>
+  }
+  <div class="flex flex-wrap gap-2">
+    <button
+      #cancel
+      type="button"
+      class="task-button"
+      [disabled]="deleting()"
+      (click)="confirm.close()"
+    >
+      {{ text().cancel }}
+    </button>
+    <button
+      type="button"
+      class="task-button task-danger"
+      [attr.aria-disabled]="deleting()"
+      (click)="remove()"
+    >
+      {{ text().remove }}
+    </button>
+  </div>
+</app-dialog>

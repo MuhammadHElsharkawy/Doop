@@ -28,6 +28,7 @@ export type TimerCommand = {
     | 'recover'
     | 'checkpoint';
   sessionId: string;
+  taskId?: string;
 };
 export type TimerChange = {
   active: ActiveSession | null;
@@ -143,6 +144,7 @@ function newActive(
   sessionId: string,
   startedAt: IsoInstant,
   timing: ActiveTimerTiming,
+  task?: Pick<ActiveSession, 'taskId' | 'taskTitleSnapshot'>,
 ): ActiveSession {
   if (duration !== null) {
     const end = Date.parse(startedAt) + duration;
@@ -164,6 +166,7 @@ function newActive(
     plannedDurationMs: duration,
     taskId: null,
     taskTitleSnapshot: null,
+    ...task,
     timing,
   };
 }
@@ -171,6 +174,7 @@ function newActive(
 export interface TimerContext {
   cycle?: PomodoroCycle;
   settings?: WorkspaceSettings;
+  task?: Pick<ActiveSession, 'taskId' | 'taskTitleSnapshot'>;
 }
 
 export function elapsedActiveMs(
@@ -250,6 +254,7 @@ export function transitionTimer(
           command.sessionId,
           wallAnchor,
           timing,
+          context.task,
         ),
       };
     if (command.type === 'start-stopwatch')
@@ -260,6 +265,7 @@ export function transitionTimer(
           command.sessionId,
           wallAnchor,
           timing,
+          context.task,
         ),
       };
     return;

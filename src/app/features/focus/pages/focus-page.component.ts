@@ -13,6 +13,9 @@ import {
 import { Title } from '@angular/platform-browser';
 import { LocalizationService } from '../../../core/localization/localization.service';
 import { DialogComponent } from '../../../shared/ui/dialog.component';
+import { TasksService } from '../../tasks/application/tasks.service';
+import { FocusHistoryComponent } from './focus-history.component';
+import { AmbientSoundComponent } from './ambient-sound.component';
 import { FocusTimerService } from '../application/focus-timer.service';
 import { validBreakSetting, validFocusMinutes } from '../domain/focus-settings';
 import { focusMessages } from './focus-messages';
@@ -22,7 +25,7 @@ type FormError = 'duration' | 'short' | 'long' | 'frequency' | 'write';
 
 @Component({
   selector: 'app-focus-page',
-  imports: [DialogComponent],
+  imports: [DialogComponent, FocusHistoryComponent, AmbientSoundComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   styles: `
     button[aria-pressed='true'] {
@@ -39,6 +42,8 @@ type FormError = 'duration' | 'short' | 'long' | 'frequency' | 'write';
 })
 export class FocusPageComponent {
   protected readonly timer = inject(FocusTimerService);
+  protected readonly tasks = inject(TasksService);
+  protected readonly selectedTask = signal('');
   protected readonly locale = inject(LocalizationService);
   protected readonly mode = signal<'timer' | 'stopwatch'>('timer');
   protected readonly panel = signal<Panel | null>(null);
@@ -127,6 +132,12 @@ export class FocusPageComponent {
 
   constructor() {
     effect(() => this.title.setTitle(this.locale.text().focus + ' · Doop'));
+    effect(() => {
+      if (this.timer.taskUnavailable()) {
+        this.selectedTask.set('');
+        void this.tasks.retry();
+      }
+    });
   }
 
   protected minuteLabel(minutes: number): string {

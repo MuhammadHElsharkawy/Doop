@@ -1,0 +1,83 @@
+<section class="task-list px-5 py-4" aria-labelledby="ambient-sound">
+  <h2 id="ambient-sound" class="text-lg font-semibold">
+    {{ text().soundTitle }}
+  </h2>
+  @if (!ready()) {
+    <p class="mt-2 text-muted" role="status">{{ timerLoadingLabel() }}</p>
+  } @else {
+    <div class="mt-3 flex flex-wrap items-end gap-x-5 gap-y-3">
+      <div class="task-field min-w-0 flex-1">
+        <label for="ambient-track">{{ text().sound }}</label>
+        <select #track id="ambient-track" (change)="select(track.value)">
+          <option value="" [selected]="sound() === null">
+            {{ text().none }}
+          </option>
+          @for (choice of sounds; track choice) {
+            <option [value]="choice" [selected]="sound() === choice">
+              {{ names()[choice] }}
+            </option>
+          }
+        </select>
+      </div>
+      <div class="flex min-w-0 flex-1 flex-col gap-1">
+        <label for="ambient-volume" class="text-sm">
+          {{ text().volume }}
+          <span aria-hidden="true">· {{ volumeLabel() }}</span>
+        </label>
+        <input
+          #volumeInput
+          type="range"
+          id="ambient-volume"
+          min="0"
+          max="100"
+          step="1"
+          class="min-h-11 w-full"
+          [value]="volume()"
+          [attr.aria-valuetext]="volumeLabel()"
+          (input)="previewVolume(volumeInput.valueAsNumber)"
+          (change)="saveVolume(volumeInput.valueAsNumber)"
+        />
+      </div>
+    </div>
+    <div class="mt-3 flex flex-wrap items-center gap-2">
+      <button
+        type="button"
+        class="task-button"
+        [attr.aria-disabled]="
+          !sound() || playing() || player.status() === 'playing'
+        "
+        (click)="play()"
+      >
+        {{ text().play }}
+      </button>
+      <button
+        type="button"
+        class="task-button"
+        [attr.aria-disabled]="player.status() !== 'playing'"
+        (click)="player.pause()"
+      >
+        {{ text().pause }}
+      </button>
+      <button
+        type="button"
+        class="task-button"
+        [attr.aria-disabled]="!playing() && player.status() === 'stopped'"
+        (click)="stop()"
+      >
+        {{ text().stop }}
+      </button>
+    </div>
+    <p class="mt-2 text-sm text-muted" role="status">
+      {{ text()[player.status()] }}
+    </p>
+    @if (playError()) {
+      <p class="mt-2 task-error" role="alert">{{ text().soundError }}</p>
+    }
+    @if (pending() && !saving()) {
+      <p class="mt-2 task-error" role="alert">{{ text().soundSaveError }}</p>
+      <button class="task-button mt-2" type="button" (click)="save(pending())">
+        {{ text().retrySound }}
+      </button>
+    }
+  }
+</section>

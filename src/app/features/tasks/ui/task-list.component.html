@@ -26,7 +26,10 @@
           } @else if (isOverdue(task, today())) {
             <span class="task-error">{{ text().overdue }}</span>
           }
-          @if (management() && task.expectedSessions !== null) {
+          @if (
+            management() &&
+            (task.expectedSessions !== null || counts()?.get(task.id))
+          ) {
             <span>{{ progress(task) }}</span>
           }
         </div>

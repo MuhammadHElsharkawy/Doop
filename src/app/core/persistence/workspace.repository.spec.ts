@@ -14,8 +14,15 @@ import {
 import { createRecordId } from '../domain/record-id';
 import type { FocusSession, Task } from '../domain/workspace-records';
 import { decodeBackup, encodeBackup } from './backup';
-import { WorkspaceRepository } from './workspace.repository';
+import {
+  UnavailableFocusTaskError,
+  WorkspaceRepository,
+} from './workspace.repository';
 import { defaultFocusSettings } from '../../features/focus/domain/focus-settings';
+import {
+  transitionTimer,
+  type TimerCommand,
+} from '../../features/focus/domain/focus-timer';
 
 const date = new Date(2024, 1, 29, 12);
 const day = toLocalDate(date);
@@ -70,6 +77,80 @@ describe('workspace repositories', () => {
   });
 
   afterEach(() => db.close());
+
+  it('resolves a live task on start and freezes its latest title on the saved session', async () => {
+    const wall = date.getTime();
+    const start: TimerCommand = {
+      type: 'start-stopwatch',
+      sessionId: 'linked',
+      taskId: task.id,
+    };
+    const input = (elapsedMs: number) => ({
+      wall: wall + elapsedMs,
+      elapsedMs,
+      observedCompletion: true,
+      revision: 'rev-' + elapsedMs,
+      zone: { timeZone: null, offsetMinutes: date.getTimezoneOffset() },
+    });
+    const initial = await repositories.focusSnapshot();
+    const begin = () =>
+      repositories.updateFocus(
+        initial,
+        (snapshot, task) =>
+          transitionTimer(snapshot.active, start, input(0), {
+            ...snapshot,
+            task,
+          }),
+        start.type,
+        start.taskId,
+      );
+    await expect(begin()).rejects.toBeInstanceOf(UnavailableFocusTaskError);
+    expect(await repositories.focusSnapshot()).toEqual(initial);
+
+    await repositories.tasks.add(task);
+    expect(await begin()).toMatchObject({
+      active: { taskId: task.id, taskTitleSnapshot: task.title },
+      result: 'committed',
+    });
+    await repositories.tasks.update(
+      task.id,
+      (row) => ({ ...row, title: 'Before save' }),
+      'edit',
+    );
+    const apply = async (type: 'pause' | 'save', elapsedMs: number) => {
+      const expected = await repositories.focusSnapshot();
+      return repositories.updateFocus(
+        expected,
+        (snapshot) =>
+          transitionTimer(
+            snapshot.active,
+            { type, sessionId: start.sessionId },
+            input(elapsedMs),
+            snapshot,
+          ),
+        type,
+      );
+    };
+    await apply('pause', 2000);
+    await apply('save', 3000);
+    expect(await repositories.sessions.list()).toMatchObject([
+      {
+        taskId: task.id,
+        taskTitleSnapshot: 'Before save',
+        actualDurationSeconds: 2,
+      },
+    ]);
+    await repositories.tasks.update(
+      task.id,
+      (row) => ({ ...row, title: 'After save' }),
+      'edit',
+    );
+    await repositories.tasks.softDelete(task.id, now);
+    await expect(begin()).rejects.toBeInstanceOf(UnavailableFocusTaskError);
+    const backup = await repositories.snapshot(preferences, now);
+    expect(backup.sessions[0]?.taskTitleSnapshot).toBe('Before save');
+    expect(decodeBackup(encodeBackup(backup))).toMatchObject({ ok: true });
+  });
 
   it('rejects invalid settings in backups and repairs legacy stored break limits on the next successful focus write', async () => {
     const snapshot = await repositories.snapshot(preferences, now);

@@ -13,9 +13,13 @@ import type {
   WorkspaceSettings,
 } from '../../../core/domain/workspace-records';
 import { createRecordId } from '../../../core/domain/record-id';
+import { FocusHistoryService } from '../../../core/persistence/focus-history.service';
 import { PersistenceService } from '../../../core/persistence/persistence.service';
 import { InvalidActiveSessionError } from '../../../core/persistence/record-validation';
-import { sameFocusRevision } from '../../../core/persistence/workspace.repository';
+import {
+  sameFocusRevision,
+  UnavailableFocusTaskError,
+} from '../../../core/persistence/workspace.repository';
 import {
   clockDisagrees,
   elapsedSinceResume,
@@ -39,6 +43,7 @@ import {
 export class FocusTimerService {
   private readonly persistence = inject(PersistenceService);
   private readonly repository = this.persistence.repositories;
+  private readonly history = inject(FocusHistoryService);
   private readonly document = inject(DOCUMENT);
   private readonly snapshot = signal<Awaited<
     ReturnType<typeof this.repository.focusSnapshot>
@@ -48,6 +53,7 @@ export class FocusTimerService {
   private readonly failure = signal<(() => Promise<void>) | null>(null);
   private readonly invalid = signal(false);
   private readonly conflict = signal(false);
+  private readonly unavailableTask = signal(false);
   private readonly failedAction = signal<TimerCommand['type'] | null>(null);
   private anchor?: RunningAnchor;
   private observedAt?: number;
@@ -68,6 +74,7 @@ export class FocusTimerService {
     () => this.hasError() && this.failedAction() === 'resume',
   );
   readonly changedElsewhere = this.conflict.asReadonly();
+  readonly taskUnavailable = this.unavailableTask.asReadonly();
   readonly active = computed(() => this.snapshot()?.active);
   readonly settings = computed(
     () => this.snapshot()?.settings ?? defaultFocusSettings,
@@ -132,7 +139,7 @@ export class FocusTimerService {
     void this.sync();
   }
 
-  activate(mode: 'timer' | 'stopwatch'): void {
+  activate(mode: 'timer' | 'stopwatch', taskId = ''): void {
     if (
       this.busy() ||
       this.hasError() ||
@@ -150,6 +157,7 @@ export class FocusTimerService {
               ? 'start'
               : 'start-stopwatch',
           sessionId: createRecordId(),
+          taskId: this.pendingBreak() ? undefined : taskId || undefined,
         },
         this.sample(),
       );
@@ -213,9 +221,20 @@ export class FocusTimerService {
   }
 
   async configure(
-    patch: BreakSettings | Pick<WorkspaceSettings, 'focusDurationMinutes'>,
+    patch:
+      | BreakSettings
+      | Partial<
+          Pick<
+            WorkspaceSettings,
+            | 'focusDurationMinutes'
+            | 'dailyGoal'
+            | 'ambientSound'
+            | 'ambientVolume'
+          >
+        >,
   ): Promise<void> {
-    if (this.busy() || this.hasError()) return;
+    if (this.busy() || !this.snapshot())
+      throw new Error('Focus settings are not ready');
     this.writeGeneration++;
     this.working.set(true);
     try {
@@ -397,12 +416,18 @@ export class FocusTimerService {
     this.writeGeneration++;
     this.working.set(true);
     this.conflict.set(false);
+    if (action === 'start' || action === 'start-stopwatch')
+      this.unavailableTask.set(false);
     try {
       const state = await this.repository.updateFocus(
         expected,
-        (snapshot) =>
-          transitionTimer(snapshot.active, command, input, snapshot),
+        (snapshot, task) =>
+          transitionTimer(snapshot.active, command, input, {
+            ...snapshot,
+            task,
+          }),
         action,
+        command.taskId,
       );
       const committed = state.result === 'committed';
       this.adopt(state, committed ? at : undefined);
@@ -414,9 +439,13 @@ export class FocusTimerService {
           action !== 'checkpoint',
       );
       if (committed) this.channel?.postMessage('changed');
+      if ('historyChanged' in state && state.historyChanged)
+        void this.history.changed();
       return state.result;
     } catch (error) {
       if (error instanceof InvalidActiveSessionError) this.rejectSnapshot();
+      else if (error instanceof UnavailableFocusTaskError)
+        this.unavailableTask.set(true);
       else {
         this.failedAction.set(action);
         this.failure.set(() => {

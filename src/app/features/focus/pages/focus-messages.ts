@@ -3,6 +3,14 @@ export const focusMessages = {
     mode: 'Pomodoro Timer',
     stopwatch: 'Stopwatch',
     modeLabel: 'Focus mode',
+    task: 'Task (optional)',
+    noTask: 'No task',
+    tasksLoading: 'Loading tasks…',
+    tasksError:
+      'Tasks could not be loaded. You can still start without a task.',
+    retryTasks: 'Retry loading tasks',
+    taskUnavailable:
+      'That task is no longer available. Choose another task or start without one.',
     start: 'Start',
     pause: 'Pause',
     resume: 'Resume',
@@ -57,6 +65,13 @@ export const focusMessages = {
     mode: 'مؤقت بومودورو',
     stopwatch: 'ساعة إيقاف',
     modeLabel: 'وضع التركيز',
+    task: 'المهمة (اختيارية)',
+    noTask: 'بلا مهمة',
+    tasksLoading: 'جارٍ تحميل المهام…',
+    tasksError: 'تعذّر تحميل المهام. لا يزال بإمكانك البدء بلا مهمة.',
+    retryTasks: 'إعادة محاولة تحميل المهام',
+    taskUnavailable:
+      'هذه المهمة لم تعد متاحة. اختر مهمة أخرى أو ابدأ بلا مهمة.',
     start: 'ابدأ',
     pause: 'إيقاف مؤقت',
     resume: 'استئناف',

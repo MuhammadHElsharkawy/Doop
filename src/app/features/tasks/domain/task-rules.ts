@@ -1,4 +1,5 @@
 import { isLocalDate, type LocalDate } from '../../../core/clock/local-date';
+import { countsTowardFocus } from '../../../core/domain/focus-metrics';
 import type {
   FocusSession,
   Task,
@@ -87,7 +88,7 @@ export function countTaskSessions(
 ): ReadonlyMap<string, number> {
   const counts = new Map<string, number>();
   for (const session of sessions) {
-    if (session.taskId !== null && session.status === 'completed') {
+    if (session.taskId !== null && countsTowardFocus(session)) {
       counts.set(session.taskId, (counts.get(session.taskId) ?? 0) + 1);
     }
   }

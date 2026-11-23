@@ -20,6 +20,12 @@ An unsuccessful timer write leaves the persisted state intact and offers retry. 
 
 Break settings show the allowed ranges in validation feedback. If continuing a paused session fails, Focus explains that it remains paused and Retry repeats the resume.
 
+Before starting Pomodoro or Stopwatch, Focus offers a native task select with No task as the default. A task that becomes unavailable before Start is rejected with feedback, and the user can select again. A session shows the title captured on start until it is saved.
+
+Focus shows the daily goal and eligible Focus Time alongside a native goal field. History uses a native date input with an All dates action. History displays saved partials with a separate outcome label. Session removal uses the shared confirmation dialog with Cancel focused first. Failed deletion keeps the dialog and action available. Successful deletion returns focus to the date filter.
+
+The ambient sound controls use a native select and range field. Changing tracks stops playback. Play requires an explicit action, including after reload. Playback is independent of timer controls and internal navigation while the browser allows it. The selection and volume persist, with retry when saving fails.
+
 Task filters, sorting, and priority use native selects. Due dates use a native date input whose picker follows the device and browser. Doop labels and displays dates in the selected app language and persists the date-only value. The task list uses responsive rows with text labels for priority, status, and actions.
 
 Habits and Overview share the HabitForm and Today's Habits. The form uses the same full-height mobile sheet and native date input, plus native radios and weekday checkboxes. Arabic weekdays start with Saturday and follow the document direction. The Habits consistency period is a native select. Save and delete follow the Tasks dialog and error patterns. Completion and undo keep focus on the same row. Archive and restore move the row between active and archived lists. Overview shows all of today's occurrences in a contained scroll area and provides a link to Habits. See [habit requirements](PRD.md#7-habit-management-requirements) and [Overview requirements](PRD.md#55-todays-habits).

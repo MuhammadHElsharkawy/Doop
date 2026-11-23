@@ -42,6 +42,10 @@ M6 extends the existing timing metadata to breaks and Stopwatch. The cycle can c
 
 Short breaks are limited to 1–60 minutes, long breaks to 1–120 minutes, and the long-break frequency to 1–12 sessions. Backup decoding rejects out-of-range settings. Existing settings rows written under earlier rules are read with the affected out-of-range values replaced by their defaults. Other preferences are preserved. The repaired row is committed alongside the next successful Focus transition or settings save.
 
+Focus start resolves the optional task ID against the latest non-deleted task in the timer transaction. It stores a title snapshot on the active session. History uses the title at save time, including a valid task tombstone. If the task record is missing or unreadable, history keeps the start snapshot. Later task edits or deletion leave saved history intact.
+
+Focus and Tasks derive counts from completed history records. Daily metrics and history date filters use the stored local completion date. History shows the end time at its recorded offset and the start instant in the viewer’s local time zone because the history format does not store a start offset. History deletion removes only the history row. Commit notifications refresh the shared history in open tabs and views refresh again when foregrounded. The daily goal, sound selection, and volume use the existing workspace settings fields. Audio playback state stays in memory. Database and backup versions stay at 3 and 2.
+
 ## JSON backup
 
 The version 2 contract uses the `doop-backup` format identifier and includes an export timestamp, durable productivity collections, workspace settings, and appearance preferences. It carries the habit deletion-date field. The decoder upgrades valid version 1 payloads in memory using the same unknown-date policy. Active session and cycle state stay outside the backup. A readonly transaction captures the IndexedDB portion as one snapshot.

@@ -578,6 +578,8 @@ export function sameFocusRevision(
   );
 }
 
+export class UnavailableFocusTaskError extends Error {}
+
 interface FocusSnapshot {
   active: ActiveSession | undefined;
   cycle: PomodoroCycle | undefined;
@@ -631,7 +633,10 @@ export class WorkspaceRepository {
 
   updateFocus(
     expected: Pick<FocusSnapshot, 'active' | 'cycle'>,
-    transition: (snapshot: FocusSnapshot) =>
+    transition: (
+      snapshot: FocusSnapshot,
+      task?: Pick<ActiveSession, 'taskId' | 'taskTitleSnapshot'>,
+    ) =>
       | {
           active: ActiveSession | null;
           completion?: FocusSession;
@@ -639,9 +644,10 @@ export class WorkspaceRepository {
         }
       | undefined,
     action: string,
+    startTaskId?: string,
   ) {
     return this.database.run(
-      ['activeSession', 'sessions', 'cycle', 'settings'],
+      ['activeSession', 'sessions', 'cycle', 'settings', 'tasks'],
       'readwrite',
       async (tx) => {
         const activeStore = tx.objectStore('activeSession');
@@ -663,7 +669,19 @@ export class WorkspaceRepository {
           !sameCycle(expected.cycle, cycle)
         )
           return { ...snapshot, result: 'conflict' as const };
-        const next = transition(snapshot);
+        const tasks = tx.objectStore('tasks');
+        let association:
+          Pick<ActiveSession, 'taskId' | 'taskTitleSnapshot'> | undefined;
+        if (startTaskId && !active && !cycle?.pendingBreak) {
+          const row = await tasks.get(startTaskId);
+          const task = row === undefined ? undefined : verify('tasks', row);
+          if (!task || task.deletedAt)
+            throw new UnavailableFocusTaskError(
+              'Task is no longer available for focus',
+            );
+          association = { taskId: task.id, taskTitleSnapshot: task.title };
+        }
+        const next = transition(snapshot, association);
         if (!next) return { ...snapshot, result: 'unchanged' as const };
         if (
           storedSettings !== undefined &&
@@ -673,7 +691,15 @@ export class WorkspaceRepository {
           await tx.objectStore('settings').put(verify('settings', settings));
 
         if (next.completion) {
-          const completion = verify('sessions', next.completion);
+          const row = active?.taskId
+            ? await tasks.get(active.taskId)
+            : undefined;
+          const completion = verify('sessions', {
+            ...next.completion,
+            taskTitleSnapshot: recordValidators.tasks(row)
+              ? row.title
+              : next.completion.taskTitleSnapshot,
+          });
           if (
             active?.sessionId !== completion.id ||
             next.active?.sessionId === completion.id
@@ -700,6 +726,7 @@ export class WorkspaceRepository {
           active: next.active ?? undefined,
           cycle: next.cycle ?? cycle,
           settings,
+          historyChanged: next.completion !== undefined,
           result: 'committed' as const,
         };
       },

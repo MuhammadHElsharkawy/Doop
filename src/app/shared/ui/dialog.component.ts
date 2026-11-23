@@ -50,10 +50,12 @@ export class DialogComponent {
   private readonly panel =
     viewChild.required<ElementRef<HTMLDialogElement>>('panel');
   private trigger?: HTMLElement;
+  private fallback?: HTMLElement;
   private readonly injector = inject(Injector);
 
-  open(trigger: HTMLElement): void {
+  open(trigger: HTMLElement, fallback?: HTMLElement): void {
     this.trigger = trigger;
+    this.fallback = fallback;
     this.panel().nativeElement.showModal();
   }
 
@@ -68,8 +70,9 @@ export class DialogComponent {
   protected restoreFocus(): void {
     if (this.panel().nativeElement.open) return;
     const trigger = this.trigger;
-    const fallback = trigger?.closest<HTMLElement>('main');
+    const fallback = this.fallback ?? trigger?.closest<HTMLElement>('main');
     this.trigger = undefined;
+    this.fallback = undefined;
     this.closed.emit();
     afterNextRender(
       () => {

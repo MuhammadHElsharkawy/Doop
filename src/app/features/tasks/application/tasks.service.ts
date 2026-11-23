@@ -10,10 +10,8 @@ import {
 } from '@angular/core';
 import { toIsoInstant, toLocalDate } from '../../../core/clock/local-date';
 import { createRecordId } from '../../../core/domain/record-id';
-import type {
-  FocusSession,
-  Task,
-} from '../../../core/domain/workspace-records';
+import type { Task } from '../../../core/domain/workspace-records';
+import { FocusHistoryService } from '../../../core/persistence/focus-history.service';
 import { PersistenceService } from '../../../core/persistence/persistence.service';
 import {
   countTaskSessions,
@@ -35,7 +33,7 @@ export class TasksService {
   private readonly repository = this.persistence.repositories.tasks;
   private readonly document = inject(DOCUMENT);
   private readonly records = signal<Task[]>([]);
-  private readonly sessions = signal<FocusSession[] | null>(null);
+  private readonly history = inject(FocusHistoryService);
   private readonly state = signal<'loading' | 'ready' | 'error'>('loading');
   private readonly running = signal(false);
   private readonly viewError = signal(false);
@@ -60,6 +58,7 @@ export class TasksService {
   readonly overview = computed(() =>
     selectTodayTasks(this.records(), this.today()),
   );
+  readonly available = this.records.asReadonly();
   readonly counts = computed(() => {
     const total = this.records().length;
     const completed = this.records().filter(
@@ -68,7 +67,7 @@ export class TasksService {
     return { total, completed, pending: total - completed };
   });
   readonly sessionCounts = computed(() => {
-    const sessions = this.sessions();
+    const sessions = this.history.sessions();
     return sessions === null ? null : countTaskSessions(sessions);
   });
 
@@ -107,24 +106,20 @@ export class TasksService {
   async retry(): Promise<void> {
     if (this.busy()) return;
     await this.persistence.retry();
-    await this.load();
+    await Promise.all([this.load(), this.history.refresh()]);
   }
 
   private async load(): Promise<void> {
     const request = ++this.loadId;
     if (this.state() !== 'ready') this.state.set('loading');
-    const [tasks, history] = await Promise.allSettled([
-      this.repository.list(),
-      this.persistence.repositories.sessions.list(),
-    ]);
-    if (request !== this.loadId) return;
-    if (tasks.status === 'rejected') {
-      this.state.set('error');
-      return;
+    try {
+      const tasks = await this.repository.list();
+      if (request !== this.loadId) return;
+      this.records.set(tasks);
+      this.state.set('ready');
+    } catch {
+      if (request === this.loadId) this.state.set('error');
     }
-    this.records.set(tasks.value);
-    this.sessions.set(history.status === 'fulfilled' ? history.value : null);
-    this.state.set('ready');
   }
 
   setFilter(value: string): void {

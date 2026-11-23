@@ -162,11 +162,11 @@ button {
   line-height: 1.2;
 }
 
-.task-button:hover:not(:disabled) {
+.task-button:hover:not(:disabled, [aria-disabled='true']) {
   background: var(--hover);
 }
 
-.task-button:disabled {
+.task-button:is(:disabled, [aria-disabled='true']) {
   opacity: 0.55;
   cursor: default;
 }

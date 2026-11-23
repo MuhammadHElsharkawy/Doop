@@ -6,7 +6,9 @@ test('catches up after Chromium freezes the page lifecycle', async ({
 }) => {
   await page.goto('/focus');
   await page.getByRole('button', { name: 'Start', exact: true }).click();
-  await expect(page.getByRole('button', { name: 'Pause' })).toBeVisible();
+  await expect(
+    page.getByRole('button', { name: 'Pause', exact: true }),
+  ).toBeVisible();
   const readSeconds = async () => {
     const [minutes, seconds] = (
       await page.getByRole('timer').innerText()
@@ -33,20 +35,24 @@ test('recovers running and paused timers across navigation and refresh', async (
   const timer = page.getByRole('timer');
   await expect(timer).toHaveText('25:00');
   await page.getByRole('button', { name: 'Start', exact: true }).press('Enter');
-  await expect(page.getByRole('button', { name: 'Pause' })).toBeVisible();
+  await expect(
+    page.getByRole('button', { name: 'Pause', exact: true }),
+  ).toBeVisible();
   await page.clock.fastForward(60_000);
   await page.getByRole('link', { name: 'Overview' }).click();
   await page.getByRole('link', { name: 'Focus' }).click();
   await page.reload();
   await expect(timer).toHaveText(/^\s*2[34]:/);
-  await page.getByRole('button', { name: 'Pause' }).click();
+  await page.getByRole('button', { name: 'Pause', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Resume' })).toBeVisible();
   const paused = (await timer.innerText()).trim();
   await page.clock.fastForward(120_000);
   await page.reload();
   await expect(timer).toHaveText(paused);
   await page.getByRole('button', { name: 'Resume' }).press('Enter');
-  await expect(page.getByRole('button', { name: 'Pause' })).toBeVisible();
+  await expect(
+    page.getByRole('button', { name: 'Pause', exact: true }),
+  ).toBeVisible();
   await page.clock.fastForward(5000);
   await expect(timer).not.toHaveText(paused);
 });
@@ -57,12 +63,16 @@ test('finishes after skipped callbacks and recovers at the persisted deadline ex
   await page.clock.install();
   await page.goto('/focus');
   await page.getByRole('button', { name: 'Start', exact: true }).click();
-  await expect(page.getByRole('button', { name: 'Pause' })).toBeVisible();
+  await expect(
+    page.getByRole('button', { name: 'Pause', exact: true }),
+  ).toBeVisible();
   await page.clock.fastForward(26 * 60_000);
   await expect(page.getByRole('button', { name: 'Start break' })).toBeVisible();
   await page.getByRole('button', { name: 'Skip break' }).click();
   await page.getByRole('button', { name: 'Start', exact: true }).click();
-  await expect(page.getByRole('button', { name: 'Pause' })).toBeVisible();
+  await expect(
+    page.getByRole('button', { name: 'Pause', exact: true }),
+  ).toBeVisible();
   await page.clock.fastForward(30 * 60_000);
   await expect(page.getByText('Focus session complete')).toBeVisible();
   await page.goto('/overview');

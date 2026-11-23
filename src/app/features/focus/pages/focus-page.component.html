@@ -80,13 +80,52 @@
         </button>
       </div>
     }
+    @if (phase === 'idle') {
+      <div class="task-field mx-auto mb-4 max-w-xs text-start">
+        <label for="focus-task">{{ text().task }}</label>
+        <select
+          #taskSelect
+          id="focus-task"
+          [disabled]="blocked() || tasks.status() !== 'ready'"
+          (change)="selectedTask.set(taskSelect.value)"
+        >
+          <option value="" [selected]="!selectedTask()">
+            {{ text().noTask }}
+          </option>
+          @for (task of tasks.available(); track task.id) {
+            <option [value]="task.id" [selected]="selectedTask() === task.id">
+              {{ task.title }}
+            </option>
+          }
+        </select>
+        @if (tasks.status() === 'loading') {
+          <p class="text-sm text-muted" role="status">
+            {{ text().tasksLoading }}
+          </p>
+        } @else if (tasks.status() === 'error') {
+          <p class="task-error" role="alert">{{ text().tasksError }}</p>
+          <button class="task-button" type="button" (click)="tasks.retry()">
+            {{ text().retryTasks }}
+          </button>
+        }
+      </div>
+    } @else if (timer.active()?.taskTitleSnapshot; as title) {
+      <p class="mb-4 break-words text-sm text-muted">
+        <bdi>{{ title }}</bdi>
+      </p>
+    }
     <div class="flex flex-wrap justify-center gap-2">
       <button
         #primary
         type="button"
         class="task-button task-primary"
         [attr.aria-disabled]="blocked()"
-        (click)="timer.activate(mode())"
+        (click)="
+          timer.activate(
+            mode(),
+            tasks.status() === 'ready' ? selectedTask() : ''
+          )
+        "
       >
         {{ action() }}
       </button>
@@ -134,6 +173,9 @@
     @if (timer.changedElsewhere()) {
       <p class="mt-4 text-muted" role="status">{{ text().conflict }}</p>
     }
+    @if (phase === 'idle' && timer.taskUnavailable()) {
+      <p class="mt-4 task-error" role="alert">{{ text().taskUnavailable }}</p>
+    }
     @if (presetError()) {
       <p class="mt-4 task-error" role="alert">{{ text().error }}</p>
     }
@@ -155,6 +197,9 @@
     }
   }
 </section>
+
+<app-ambient-sound class="mt-6 block max-w-lg" />
+<app-focus-history class="mt-6 block max-w-3xl" />
 
 <app-dialog
   #dialog

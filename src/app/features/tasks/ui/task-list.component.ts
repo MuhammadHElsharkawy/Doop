@@ -48,6 +48,11 @@ export class TaskListComponent {
 
   protected progress(task: Task): string {
     const counts = this.counts();
+    if (task.expectedSessions === null)
+      return this.text().actualSessions.replace(
+        '{actual}',
+        this.numbers().format(counts?.get(task.id) ?? 0),
+      );
     const expected = this.numbers().format(task.expectedSessions ?? 0);
     if (!counts)
       return this.text().sessionTarget.replace('{expected}', expected);
