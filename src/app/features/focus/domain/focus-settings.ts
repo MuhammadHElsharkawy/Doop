@@ -1,9 +1,10 @@
 import type { WorkspaceSettings } from '../../../core/domain/workspace-records';
+import { defaultDailyFocusGoal } from '../../../core/domain/focus-metrics';
 
 export const defaultFocusSettings: WorkspaceSettings = {
   id: 'settings',
   weekStartsOn: null,
-  dailyGoal: 6,
+  dailyGoal: defaultDailyFocusGoal,
   focusDurationMinutes: 25,
   shortBreakDurationMinutes: 5,
   longBreakDurationMinutes: 15,

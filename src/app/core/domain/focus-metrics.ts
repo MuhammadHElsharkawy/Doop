@@ -1,6 +1,8 @@
 import type { LocalDate } from '../clock/local-date';
 import type { FocusSession } from './workspace-records';
 
+export const defaultDailyFocusGoal = 6;
+
 export function countsTowardFocus(session: FocusSession): boolean {
   return session.status === 'completed';
 }

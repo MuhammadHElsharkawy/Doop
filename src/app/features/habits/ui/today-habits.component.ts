@@ -34,7 +34,7 @@ export class TodayHabitsComponent {
     'completedStatus' | 'undoneStatus' | 'actionError' | null
   >(null);
   protected readonly completed = computed(
-    () => this.habits.scheduled().filter((row) => !!row.completion).length,
+    () => this.habits.todayTotals().completed,
   );
   protected readonly progress = computed(() => {
     const rows = this.habits.scheduled();

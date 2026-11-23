@@ -8,6 +8,7 @@ import {
   signal,
   untracked,
 } from '@angular/core';
+import { LocalCalendarService } from '../../../core/clock/local-calendar.service';
 import {
   toIsoInstant,
   toLocalDate,
@@ -42,13 +43,12 @@ export class HabitsService {
   private readonly completions = signal<HabitCompletion[]>([]);
   private readonly state = signal<'loading' | 'ready' | 'error'>('loading');
   private readonly running = signal(false);
-  private readonly day = signal(toLocalDate(new Date()));
-  private midnight?: ReturnType<typeof setTimeout>;
+  private readonly calendar = inject(LocalCalendarService);
   private request = 0;
 
   readonly status = this.state.asReadonly();
   readonly busy = this.running.asReadonly();
-  readonly today = this.day.asReadonly();
+  readonly today = this.calendar.today;
   readonly active = computed(() =>
     this.records().filter(
       ({ habit }) => habit.deletedAt === null && habit.status === 'active',
@@ -86,6 +86,13 @@ export class HabitsService {
       ];
     });
   });
+  readonly todayTotals = computed(() => {
+    const rows = this.scheduled();
+    return {
+      total: rows.length,
+      completed: rows.filter((row) => !!row.completion).length,
+    };
+  });
 
   constructor() {
     effect(() => {
@@ -97,27 +104,13 @@ export class HabitsService {
     });
     const onVisible = () => {
       if (this.document.visibilityState !== 'visible') return;
-      this.scheduleDay();
       if (!this.busy()) void this.load();
     };
-    this.scheduleDay();
     this.document.addEventListener('visibilitychange', onVisible);
     inject(DestroyRef).onDestroy(() => {
-      clearTimeout(this.midnight);
       this.document.removeEventListener('visibilitychange', onVisible);
     });
     void this.load();
-  }
-
-  private scheduleDay(now = new Date()): void {
-    clearTimeout(this.midnight);
-    this.day.set(toLocalDate(now));
-    const next = new Date(now);
-    next.setHours(24, 0, 0, 0);
-    this.midnight = setTimeout(
-      () => this.scheduleDay(),
-      Math.max(1, next.getTime() - now.getTime()),
-    );
   }
 
   async retry(): Promise<void> {
@@ -163,7 +156,7 @@ export class HabitsService {
       const now = toIsoInstant(date);
       const { weekdays, ...details } = draft;
       if (original) {
-        this.scheduleDay(date);
+        this.calendar.refresh(date);
         await this.repository.editWithSchedule(
           original,
           details,
@@ -206,7 +199,7 @@ export class HabitsService {
     return this.mutate(async () => {
       const now = new Date();
       if (shownDate !== toLocalDate(now)) {
-        this.scheduleDay();
+        this.calendar.refresh(now);
         throw new DOMException('The local day changed', 'ConstraintError');
       }
       await this.persistence.repositories.completions.setOccurrence(

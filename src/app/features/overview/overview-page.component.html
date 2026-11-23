@@ -1,76 +1,170 @@
-<header class="task-heading">
-  <div>
-    <h1 class="page-title">{{ locale.text().overview }}</h1>
-    <p class="mt-3 text-lg text-muted">
-      {{ locale.text().overviewDescription }}
-    </p>
-  </div>
-  <button
-    #addButton
-    class="task-button task-primary"
-    type="button"
-    [disabled]="tasks.busy() || tasks.status() !== 'ready'"
-    (click)="editor.open(addButton)"
-  >
-    <span aria-hidden="true">+</span>{{ text().addTask }}
-  </button>
+<header>
+  <h1 class="page-title">{{ locale.text().overview }}</h1>
+  <p class="mt-3 text-lg font-semibold">{{ greeting() }}</p>
+  <time class="text-muted" [attr.datetime]="calendar.today()">{{
+    dateLabel()
+  }}</time>
 </header>
 
-<section class="mt-8" aria-labelledby="today-tasks">
+<section class="mt-8" aria-labelledby="daily-summary">
   <div class="task-section-heading">
-    <h2 id="today-tasks">{{ text().todayTasks }}</h2>
-    <a class="task-button" routerLink="/tasks">{{ text().viewAll }}</a>
+    <h2 id="daily-summary">{{ copy().summary }}</h2>
   </div>
-  <app-task-load-state>
-    @if (feedback(); as key) {
-      <div class="task-feedback flex flex-wrap items-center gap-2">
-        <span role="status">{{ text()[key] }}</span>
-        @if (undoTask()) {
-          <button
-            #undoButton
-            type="button"
-            class="task-button"
-            [disabled]="tasks.busy()"
-            (click)="undo()"
-          >
-            {{ text().undo }}
-          </button>
+  @if (loadingSummary()) {
+    <p class="mb-2 text-sm text-muted" role="status">{{ copy().loading }}</p>
+  }
+  <dl class="task-summary">
+    <div>
+      <dt>{{ copy().tasksCompleted }}</dt>
+      <dd>
+        @if (tasks.dueToday(); as due) {
+          {{ ratio(due) }}
+        } @else {
+          <span aria-hidden="true">—</span
+          ><span class="sr-only">{{ copy().unavailable }}</span>
         }
-      </div>
+      </dd>
+    </div>
+    <div>
+      <dt>{{ copy().habitsCompleted }}</dt>
+      <dd>
+        @if (habits.status() === 'ready') {
+          {{ ratio(habits.todayTotals()) }}
+        } @else {
+          <span aria-hidden="true">—</span
+          ><span class="sr-only">{{ copy().unavailable }}</span>
+        }
+      </dd>
+    </div>
+    <div>
+      <dt>{{ copy().focusTime }}</dt>
+      <dd>
+        @if (focus.today(); as today) {
+          {{ formatDuration()(today.seconds) }}
+        } @else {
+          <span aria-hidden="true">—</span
+          ><span class="sr-only">{{ copy().unavailable }}</span>
+        }
+      </dd>
+    </div>
+  </dl>
+</section>
+
+<div class="overview-columns mt-8">
+  <section class="min-w-0" aria-labelledby="today-tasks">
+    <div class="task-section-heading">
+      <h2 #tasksHeading id="today-tasks" tabindex="-1">
+        {{ text().todayTasks }}
+      </h2>
+      <a class="task-button" routerLink="/tasks">{{ text().viewAll }}</a>
+    </div>
+    <app-task-load-state>
+      @if (feedback(); as key) {
+        <div class="task-feedback flex flex-wrap items-center gap-2">
+          <span role="status">{{ text()[key] }}</span>
+          @if (undoTask()) {
+            <button
+              #undoButton
+              type="button"
+              class="task-button"
+              [disabled]="tasks.busy()"
+              (click)="undo()"
+            >
+              {{ text().undo }}
+            </button>
+          }
+        </div>
+      }
+      @if (failed()) {
+        <p class="notice task-error mb-3" role="alert">
+          {{ text().actionError }}
+        </p>
+      }
+      @if (tasks.overview().length) {
+        <app-task-list
+          [tasks]="tasks.overview()"
+          [today]="tasks.today()"
+          [busy]="tasks.busy()"
+          (toggleCompletion)="complete($event.task, $event.trigger)"
+        />
+      } @else {
+        <p class="notice text-muted">{{ text().noToday }}</p>
+      }
+    </app-task-load-state>
+  </section>
+  <app-today-habits class="block min-w-0" [overview]="true" />
+</div>
+
+<div class="overview-columns mt-8">
+  <section
+    class="task-list min-w-0 px-5 py-4"
+    aria-labelledby="overview-focus-goal"
+  >
+    <h2
+      #goalHeading
+      id="overview-focus-goal"
+      tabindex="-1"
+      class="text-lg font-semibold"
+    >
+      {{ goalTitle() }}
+    </h2>
+    @let target = focus.goal();
+    @if (workspaceUnavailable()) {
+      <p class="mt-2 text-muted">{{ copy().unavailable }}</p>
+    } @else if (target === 'error' || focus.status() === 'error') {
+      <p class="mt-2 task-error" role="alert">{{ copy().goalError }}</p>
+      <button
+        type="button"
+        class="task-button mt-2"
+        [attr.aria-disabled]="retryingGoal()"
+        #retryButton
+        (click)="retryGoal(goalHeading, retryButton)"
+      >
+        {{ copy().retryGoal }}
+      </button>
+    } @else if (target === 'loading' || focus.status() === 'loading') {
+      <p class="mt-2 text-muted" role="status">{{ copy().loadingGoal }}</p>
+    } @else if (focus.today(); as today) {
+      <app-focus-goal-progress
+        [count]="today.count"
+        [goal]="target"
+        [showTotal]="true"
+      />
     }
-    @if (failed()) {
-      <p class="notice task-error mb-3" role="alert">
-        {{ text().actionError }}
+  </section>
+  <section class="min-w-0" aria-labelledby="overview-actions">
+    <div class="task-section-heading">
+      <h2 id="overview-actions">{{ copy().quickActions }}</h2>
+    </div>
+    <div class="flex flex-wrap gap-2">
+      <a class="task-button task-primary" routerLink="/focus">{{
+        copy().startFocus
+      }}</a>
+      <button
+        #addButton
+        class="task-button"
+        type="button"
+        [disabled]="tasks.busy() || tasks.status() !== 'ready'"
+        (click)="editor.open(addButton)"
+      >
+        <span aria-hidden="true">+</span>{{ text().addTask }}
+      </button>
+      <button
+        #addHabit
+        class="task-button"
+        type="button"
+        [disabled]="habits.busy() || habits.status() !== 'ready'"
+        (click)="habitSaved.set(false); habitEditor.open(addHabit)"
+      >
+        <span aria-hidden="true">+</span>{{ locale.habits().add }}
+      </button>
+    </div>
+    @if (habitSaved()) {
+      <p class="mt-2 text-sm text-muted" role="status">
+        {{ locale.habits().saved }}
       </p>
     }
-    @if (tasks.overview().length) {
-      <app-task-list
-        [tasks]="tasks.overview()"
-        [today]="tasks.today()"
-        [busy]="tasks.busy()"
-        (toggleCompletion)="complete($event.task, $event.trigger)"
-      />
-    } @else {
-      <p class="notice text-muted">{{ text().noToday }}</p>
-    }
-  </app-task-load-state>
-</section>
-<div class="mt-8"><app-today-habits [overview]="true" /></div>
-<div class="flex flex-wrap items-center gap-3 mt-3">
-  <button
-    #addHabit
-    class="task-button task-primary"
-    type="button"
-    [disabled]="habits.busy() || habits.status() !== 'ready'"
-    (click)="habitSaved.set(false); habitEditor.open(addHabit)"
-  >
-    <span aria-hidden="true">+</span>{{ locale.habits().add }}
-  </button>
-  @if (habitSaved()) {
-    <span class="text-sm text-muted" role="status">{{
-      locale.habits().saved
-    }}</span>
-  }
+  </section>
 </div>
 <app-task-editor #editor (saved)="onSaved()" />
 <app-habit-editor #habitEditor (saved)="habitSaved.set(true)" />

@@ -244,6 +244,7 @@ export class FocusTimerService {
       }));
       const state = this.snapshot();
       if (state) this.adopt({ ...state, settings });
+      if ('dailyGoal' in patch) this.history.goalChanged();
       this.channel?.postMessage('changed');
     } finally {
       this.working.set(false);

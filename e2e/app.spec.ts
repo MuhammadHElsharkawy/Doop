@@ -111,12 +111,12 @@ test('applies all six themes, independent appearance, and persistent RTL prefere
   expect(colors.size).toBe(6);
 
   await dialog.getByRole('radio', { name: 'Light', exact: true }).check();
-  expect(await scheme()).toBe('light');
-  expect(await background()).not.toBe(darkBackground);
+  await expect.poll(scheme).toBe('light');
+  await expect.poll(background).not.toBe(darkBackground);
   await expect(root).toHaveAttribute('data-theme', 'amber');
   await dialog.getByRole('radio', { name: 'Dark', exact: true }).check();
-  expect(await scheme()).toBe('dark');
-  expect(await background()).toBe(darkBackground);
+  await expect.poll(scheme).toBe('dark');
+  await expect.poll(background).toBe(darkBackground);
   await dialog.getByRole('radio', { name: 'System', exact: true }).check();
   await page.emulateMedia({ colorScheme: 'light' });
   await expect.poll(background).not.toBe(darkBackground);

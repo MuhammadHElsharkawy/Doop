@@ -7,7 +7,7 @@
     <dl class="my-2 flex flex-wrap gap-x-6 gap-y-2">
       <div>
         <dt class="text-sm text-muted">{{ text().focusTime }}</dt>
-        <dd class="font-semibold">{{ duration(today.seconds) }}</dd>
+        <dd class="font-semibold">{{ formatDuration()(today.seconds) }}</dd>
       </div>
       @if (goalReady()) {
         <div>
@@ -23,19 +23,7 @@
       }
     </dl>
     @if (goalReady()) {
-      <progress
-        class="block w-full"
-        aria-labelledby="focus-goal"
-        [value]="today.count > goal() ? goal() : today.count"
-        [max]="goal()"
-      ></progress>
-      <p class="mt-1 text-sm text-muted" role="status">
-        {{
-          today.count >= goal()
-            ? text().goalReached
-            : text().remaining.replace('{count}', number(goal() - today.count))
-        }}
-      </p>
+      <app-focus-goal-progress [count]="today.count" [goal]="goal()" />
     }
   }
   @if (goalReady()) {
@@ -166,12 +154,12 @@
               @if (row.plannedDurationSeconds !== null) {
                 <div>
                   <dt class="text-muted">{{ text().planned }}</dt>
-                  <dd>{{ duration(row.plannedDurationSeconds) }}</dd>
+                  <dd>{{ formatDuration()(row.plannedDurationSeconds) }}</dd>
                 </div>
               }
               <div>
                 <dt class="text-muted">{{ text().actual }}</dt>
-                <dd>{{ duration(row.actualDurationSeconds) }}</dd>
+                <dd>{{ formatDuration()(row.actualDurationSeconds) }}</dd>
               </div>
             </dl>
           </div>

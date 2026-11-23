@@ -391,8 +391,8 @@ Requirements:
 -   Users can complete or undo completion directly from Overview.
 -   Provide a link to the Habits destination.
 -   Do not display habits that are not scheduled for the current date.
--   Adding, editing, archiving, and deleting habits are performed in the
-    Habits destination, not from Overview.
+-   Edit, archive, and delete habits in the Habits destination. The
+    Overview Add Habit quick action opens the shared creation form.
 
 ### 5.6 Focus Goal
 
@@ -1892,8 +1892,8 @@ The MVP is ready when the following are satisfied.
 -   [ ] Start Focus navigates to Focus without automatically starting a
     session.
 -   [ ] Add Task opens the task creation interface.
--   [ ] Overview does not provide habit creation, editing, archiving, or
-    deletion.
+-   [ ] Add Habit opens the shared habit creation interface. Habit
+    editing, archiving, and deletion are available in Habits.
 
 ### Tasks
 

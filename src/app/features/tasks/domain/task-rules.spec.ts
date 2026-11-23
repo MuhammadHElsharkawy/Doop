@@ -7,6 +7,7 @@ import type {
 import {
   countTaskSessions,
   isOverdue,
+  selectDueTodayTotals,
   selectTasks,
   selectTodayTasks,
   validateTaskDraft,
@@ -91,6 +92,33 @@ it('keeps at most five due, overdue, or undated pending tasks on Overview in pri
     'undated high',
     'undated medium',
   ]);
+});
+
+it('counts only non-deleted tasks due on the requested day, even when finished earlier', () => {
+  const records = [
+    task('pending', { dueDate: today }),
+    task('finished earlier', {
+      dueDate: today,
+      status: 'completed',
+      completedAt: toIsoInstant(new Date('2026-06-01T12:00:00Z')),
+    }),
+    task('deleted', { dueDate: today, deletedAt: now }),
+    task('undated', { status: 'completed', completedAt: now }),
+    task('overdue', { dueDate: yesterday }),
+    task('future', { dueDate: day('2026-06-03') }),
+  ];
+  expect(selectDueTodayTotals(records, today)).toEqual({
+    completed: 1,
+    total: 2,
+  });
+  expect(selectDueTodayTotals(records, day('2026-06-03'))).toEqual({
+    completed: 0,
+    total: 1,
+  });
+  expect(selectDueTodayTotals(records, day('2026-06-04'))).toEqual({
+    completed: 0,
+    total: 0,
+  });
 });
 
 it('validates shared TaskForm fields and normalizes Arabic input', () => {

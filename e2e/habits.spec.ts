@@ -17,7 +17,10 @@ test('refreshes scheduled habits in an open Overview at local midnight', async (
   await expect(form).toBeHidden();
   const today = page.getByRole('region', { name: 'Today’s Habits' });
   await expect(today.getByText('Sunday reading')).toHaveCount(0);
+  const date = page.locator('main header time');
+  await expect(date).toHaveAttribute('datetime', '2026-03-07');
   await page.clock.fastForward(65_000);
+  await expect(date).toHaveAttribute('datetime', '2026-03-08');
   await expect(
     today.getByRole('button', { name: 'Complete · Sunday reading' }),
   ).toBeVisible();
@@ -57,6 +60,8 @@ test('shares creation and completion across routes and keeps snapshots after edi
     name: 'Complete · Read a chapter',
   });
   await complete.press('Enter');
+  const summary = page.getByRole('region', { name: 'Daily Summary' });
+  await expect(summary.getByText('1 of 1', { exact: true })).toBeVisible();
   const undo = today.getByRole('button', {
     name: 'Undo completion · Read a chapter',
   });
@@ -64,6 +69,7 @@ test('shares creation and completion across routes and keeps snapshots after edi
   await expect(today.getByText('1 of 1 completed')).toBeVisible();
   await undo.press('Enter');
   await expect(complete).toBeFocused();
+  await expect(summary.getByText('0 of 1', { exact: true })).toBeVisible();
   await complete.click();
   await expect(undo).toBeVisible();
   await today.getByRole('link', { name: 'View habits' }).click();
@@ -180,6 +186,10 @@ test('shows an incomplete habit immediately when an edit adds today and hides it
   await page.getByRole('tab', { name: 'Today', exact: true }).click();
   await expect(today.getByText('0 of 1 completed')).toBeVisible();
   await page.getByRole('link', { name: 'Overview' }).click();
+  const overviewSummary = page.getByRole('region', { name: 'Daily Summary' });
+  await expect(
+    overviewSummary.getByText('0 of 1', { exact: true }),
+  ).toBeVisible();
   await expect(
     today.getByRole('button', { name: 'Complete · Take a walk' }),
   ).toBeVisible();
@@ -199,6 +209,10 @@ test('shows an incomplete habit immediately when an edit adds today and hides it
       .getByRole('region', { name: 'Completion history' })
       .getByText('Completed habits will appear here.'),
   ).toBeVisible();
+  await page.getByRole('link', { name: 'Overview' }).click();
+  await expect(
+    overviewSummary.getByText('0 of 0', { exact: true }),
+  ).toHaveCount(2);
 });
 
 test('keeps the form after a quota failure while inserting the first schedule', async ({
@@ -247,6 +261,11 @@ test('uses the Arabic RTL weekday controls and keeps every scheduled habit reach
   await page.clock.setFixedTime(new Date('2026-03-08T10:00:00Z'));
   await page.goto('/overview');
   await expect(page.locator('html')).toHaveAttribute('dir', 'rtl');
+  await expect(page.getByRole('region', { name: 'ملخّص اليوم' })).toBeVisible();
+  await expect(
+    page.getByRole('region', { name: 'هدف التركيز' }).getByRole('progressbar'),
+  ).toBeVisible();
+  await expect(page.getByRole('link', { name: 'ابدأ التركيز' })).toBeVisible();
   const form = page.getByRole('dialog', { name: 'إضافة عادة' });
   for (let index = 1; index <= 7; index++) {
     await page.getByRole('button', { name: 'إضافة عادة' }).click();

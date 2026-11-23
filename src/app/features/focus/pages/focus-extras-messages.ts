@@ -1,11 +1,10 @@
+import { focusGoalMessages } from '../../../core/localization/focus-metric-labels';
+
 export const focusExtras = {
   en: {
     goalTitle: 'Today’s focus',
     focusTime: 'Focus Time',
-    sessions: 'Focus Goal',
-    of: '{count} of {goal} sessions',
-    remaining: 'Sessions remaining: {count}',
-    goalReached: 'Daily goal reached',
+    ...focusGoalMessages.en,
     dailyTarget: 'Daily goal (sessions)',
     saveGoal: 'Save goal',
     invalidGoal: 'Enter a positive whole number of sessions.',
@@ -52,10 +51,7 @@ export const focusExtras = {
   ar: {
     goalTitle: 'التركيز اليوم',
     focusTime: 'وقت التركيز',
-    sessions: 'هدف التركيز',
-    of: '{count} من {goal} جلسات',
-    remaining: 'الجلسات المتبقية: {count}',
-    goalReached: 'تحقّق الهدف اليومي',
+    ...focusGoalMessages.ar,
     dailyTarget: 'الهدف اليومي (بالجلسات)',
     saveGoal: 'حفظ الهدف',
     invalidGoal: 'أدخل عددًا صحيحًا موجبًا من الجلسات.',

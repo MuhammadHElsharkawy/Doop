@@ -83,6 +83,16 @@ export function selectTodayTasks(
     .slice(0, 5);
 }
 
+export function selectDueTodayTotals(tasks: readonly Task[], today: LocalDate) {
+  const due = tasks.filter(
+    (task) => task.deletedAt === null && task.dueDate === today,
+  );
+  return {
+    total: due.length,
+    completed: due.filter((task) => task.status === 'completed').length,
+  };
+}
+
 export function countTaskSessions(
   sessions: readonly FocusSession[],
 ): ReadonlyMap<string, number> {

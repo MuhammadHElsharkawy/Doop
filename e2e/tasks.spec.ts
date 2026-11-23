@@ -39,6 +39,10 @@ test('creates from Overview, completes and undoes, and manages the same task fro
   await expect(
     preview.getByRole('heading', { name: 'Read project notes' }),
   ).toBeVisible();
+  const summary = page.getByRole('region', { name: 'Daily Summary' });
+  await expect(
+    summary.getByText('0 of 0', { exact: true }).first(),
+  ).toBeVisible();
 
   await page.getByRole('link', { name: 'View all tasks' }).click();
   await expect(page).toHaveURL(/\/tasks$/);
@@ -176,7 +180,8 @@ test('uses the Arabic RTL form and displays the same saved calendar day', async 
   await dialog.getByLabel('جلسات التركيز المتوقعة').fill('٢');
   await dialog.getByRole('button', { name: 'حفظ المهمة' }).click();
   await expect(page.getByText('مراجعة الدرس', { exact: true })).toBeVisible();
-  await expect(page.locator('time')).toHaveAttribute('datetime', '2000-01-02');
+  const today = page.getByRole('region', { name: 'مهام اليوم' });
+  await expect(today.locator('time')).toHaveAttribute('datetime', '2000-01-02');
   expect(
     await page.evaluate(
       () =>

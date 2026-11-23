@@ -40,7 +40,7 @@ test('recovers running and paused timers across navigation and refresh', async (
   ).toBeVisible();
   await page.clock.fastForward(60_000);
   await page.getByRole('link', { name: 'Overview' }).click();
-  await page.getByRole('link', { name: 'Focus' }).click();
+  await page.getByRole('link', { name: 'Focus', exact: true }).click();
   await page.reload();
   await expect(timer).toHaveText(/^\s*2[34]:/);
   await page.getByRole('button', { name: 'Pause', exact: true }).click();
@@ -76,7 +76,7 @@ test('finishes after skipped callbacks and recovers at the persisted deadline ex
   await page.clock.fastForward(30 * 60_000);
   await expect(page.getByText('Focus session complete')).toBeVisible();
   await page.goto('/overview');
-  await page.getByRole('link', { name: 'Focus' }).click();
+  await page.getByRole('link', { name: 'Focus', exact: true }).click();
   await expect(page.getByRole('timer')).toHaveText('00:00');
   await expect(page.getByText('Focus session complete')).toBeVisible();
   await page.reload();

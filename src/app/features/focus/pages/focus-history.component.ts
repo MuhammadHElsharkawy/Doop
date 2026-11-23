@@ -10,43 +10,20 @@ import {
 import { isLocalDate, type LocalDate } from '../../../core/clock/local-date';
 import { selectFocusHistory } from '../../../core/domain/focus-metrics';
 import type { FocusSession } from '../../../core/domain/workspace-records';
+import { focusDurationFormatter } from '../../../core/localization/focus-metric-labels';
 import { LocalizationService } from '../../../core/localization/localization.service';
 import { FocusHistoryService } from '../../../core/persistence/focus-history.service';
 import { DialogComponent } from '../../../shared/ui/dialog.component';
+import { FocusGoalProgressComponent } from '../../../shared/ui/focus-goal-progress.component';
 import { FocusTimerService } from '../application/focus-timer.service';
 import { focusExtras } from './focus-extras-messages';
 import { focusMessages } from './focus-messages';
 
 @Component({
   selector: 'app-focus-history',
-  imports: [DialogComponent],
+  imports: [DialogComponent, FocusGoalProgressComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './focus-history.component.html',
-  styles: `
-    progress {
-      appearance: none;
-      block-size: 0.5rem;
-      overflow: hidden;
-      border: 0;
-      border-radius: var(--radius-control);
-      background: var(--border);
-      color: var(--accent);
-    }
-    progress::-webkit-progress-bar {
-      background: var(--border);
-    }
-    progress::-webkit-progress-value {
-      background: var(--accent);
-    }
-    progress::-moz-progress-bar {
-      background: var(--accent);
-    }
-    @media (forced-colors: active) {
-      progress {
-        appearance: auto;
-      }
-    }
-  `,
 })
 export class FocusHistoryComponent {
   private readonly timer = inject(FocusTimerService);
@@ -96,15 +73,8 @@ export class FocusHistoryComponent {
         timeZone: 'UTC',
       }),
   );
-  private readonly unitFormats = computed(() =>
-    (['hour', 'minute', 'second'] as const).map(
-      (unit) =>
-        new Intl.NumberFormat(this.locale.language(), {
-          style: 'unit',
-          unit,
-          unitDisplay: 'short',
-        }),
-    ),
+  protected readonly formatDuration = computed(() =>
+    focusDurationFormatter(this.locale.language()),
   );
 
   protected number(value: number): string {
@@ -120,19 +90,6 @@ export class FocusHistoryComponent {
       Date.parse(row.endedAt) - row.completionTimezoneOffsetMinutes * 60_000,
     );
     return this.recordedTimeFormat().format(end);
-  }
-
-  protected duration(seconds: number): string {
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor(seconds / 60) % 60;
-    return [hours, minutes, seconds % 60]
-      .map((value, index) =>
-        value || (index === 2 && !hours && !minutes)
-          ? this.unitFormats()[index].format(value)
-          : '',
-      )
-      .filter(Boolean)
-      .join(' ');
   }
 
   protected filterDate(value: string): void {

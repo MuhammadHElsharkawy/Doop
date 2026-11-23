@@ -78,6 +78,9 @@ test('shows an Arabic storage failure and recovers using the keyboard', async ({
   await expect(page.getByRole('alert')).toHaveCount(0);
   await expect(page.getByRole('heading', { name: 'نظرة عامة' })).toBeVisible();
   await expect(page.getByRole('main')).toBeFocused();
+  await expect(
+    page.getByRole('region', { name: 'هدف التركيز' }).getByRole('progressbar'),
+  ).toBeVisible();
 });
 
 test('reports a blocked migration and completes when the old connection closes', async ({

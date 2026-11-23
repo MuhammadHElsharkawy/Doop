@@ -46,6 +46,8 @@ Focus start resolves the optional task ID against the latest non-deleted task in
 
 Focus and Tasks derive counts from completed history records. Daily metrics and history date filters use the stored local completion date. History shows the end time at its recorded offset and the start instant in the viewer’s local time zone because the history format does not store a start offset. History deletion removes only the history row. Commit notifications refresh the shared history in open tabs and views refresh again when foregrounded. The daily goal, sound selection, and volume use the existing workspace settings fields. Audio playback state stays in memory. Database and backup versions stay at 3 and 2.
 
+Overview composes the task, habit, and focus read models. The summary uses current task status for non-deleted tasks due on the local date, the same eligible habit occurrences shown in Habits, and saved eligible focus history grouped by its stored completion date. A shared local calendar refreshes these views at day changes and on foregrounding. The daily focus goal reads the validated workspace setting independently of active timer recovery.
+
 ## JSON backup
 
 The version 2 contract uses the `doop-backup` format identifier and includes an export timestamp, durable productivity collections, workspace settings, and appearance preferences. It carries the habit deletion-date field. The decoder upgrades valid version 1 payloads in memory using the same unknown-date policy. Active session and cycle state stay outside the backup. A readonly transaction captures the IndexedDB portion as one snapshot.

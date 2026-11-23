@@ -607,6 +607,18 @@ export class WorkspaceRepository {
   readonly cycle;
   readonly settings;
 
+  readFocusSettings() {
+    return this.database.run(
+      ['settings'],
+      'readonly',
+      async (tx) => {
+        const row = await tx.objectStore('settings').get('settings');
+        return row === undefined ? undefined : recoverLegacySettings(row);
+      },
+      'focus:readSettings',
+    );
+  }
+
   focusSnapshot() {
     return this.database.run(
       ['activeSession', 'cycle', 'settings'],

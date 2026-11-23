@@ -8,7 +8,8 @@ import {
   signal,
   untracked,
 } from '@angular/core';
-import { toIsoInstant, toLocalDate } from '../../../core/clock/local-date';
+import { LocalCalendarService } from '../../../core/clock/local-calendar.service';
+import { toIsoInstant } from '../../../core/clock/local-date';
 import { createRecordId } from '../../../core/domain/record-id';
 import type { Task } from '../../../core/domain/workspace-records';
 import { FocusHistoryService } from '../../../core/persistence/focus-history.service';
@@ -17,6 +18,7 @@ import {
   countTaskSessions,
   filters,
   selectTasks,
+  selectDueTodayTotals,
   selectTodayTasks,
   sorts,
   type TaskDraft,
@@ -38,13 +40,11 @@ export class TasksService {
   private readonly running = signal(false);
   private readonly viewError = signal(false);
   private readonly viewState = signal(this.readView());
-  private readonly day = signal(toLocalDate(new Date()));
-  private midnight?: ReturnType<typeof setTimeout>;
   private loadId = 0;
 
   readonly status = this.state.asReadonly();
   readonly busy = this.running.asReadonly();
-  readonly today = this.day.asReadonly();
+  readonly today = inject(LocalCalendarService).today;
   readonly view = this.viewState.asReadonly();
   readonly viewStorageError = this.viewError.asReadonly();
   readonly visible = computed(() =>
@@ -59,6 +59,11 @@ export class TasksService {
     selectTodayTasks(this.records(), this.today()),
   );
   readonly available = this.records.asReadonly();
+  readonly dueToday = computed(() =>
+    this.status() === 'ready'
+      ? selectDueTodayTotals(this.records(), this.today())
+      : null,
+  );
   readonly counts = computed(() => {
     const total = this.records().length;
     const completed = this.records().filter(
@@ -77,30 +82,15 @@ export class TasksService {
         untracked(() => void this.load());
       }
     });
-    this.scheduleDay();
     const onVisible = () => {
       if (this.document.visibilityState !== 'visible') return;
-      this.scheduleDay();
       if (this.state() === 'ready' && !this.busy()) void this.load();
     };
     this.document.addEventListener('visibilitychange', onVisible);
     inject(DestroyRef).onDestroy(() => {
-      clearTimeout(this.midnight);
       this.document.removeEventListener('visibilitychange', onVisible);
     });
     void this.load();
-  }
-
-  private scheduleDay(): void {
-    clearTimeout(this.midnight);
-    const now = new Date();
-    this.day.set(toLocalDate(now));
-    const next = new Date(now);
-    next.setHours(24, 0, 0, 0);
-    this.midnight = setTimeout(
-      () => this.scheduleDay(),
-      Math.max(1, next.getTime() - now.getTime()),
-    );
   }
 
   async retry(): Promise<void> {
