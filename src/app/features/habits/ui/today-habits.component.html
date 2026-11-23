@@ -1,5 +1,5 @@
 <section aria-labelledby="today-habits">
-  <div class="task-section-heading">
+  <div class="task-section-heading" [class.sr-only]="!overview()">
     <h2 id="today-habits" tabindex="-1">{{ text().today }}</h2>
     @if (overview()) {
       <a class="task-button" routerLink="/habits">{{ text().viewAll }}</a>
@@ -17,36 +17,74 @@
       }
     }
     @if (habits.scheduled().length) {
-      <p class="mb-2 text-sm text-muted">{{ progress() }}</p>
-      <ul class="task-list" [class.habit-scroll]="overview()">
+      @if (!overview()) {
+        <div class="day-summary">
+          <span>{{ progress() }}</span><progress
+            [value]="completed()"
+            [max]="habits.scheduled().length"
+            [attr.aria-label]="progress()"
+          ></progress>
+        </div>
+      } @else {
+        <p class="mb-2 text-sm text-muted">{{ progress() }}</p>
+      }
+      <ul
+        class="task-list"
+        [class.day-list]="!overview()"
+        [class.habit-scroll]="overview()"
+      >
         @for (item of habits.scheduled(); track item.habit.id) {
-          <li class="task-row">
-            <div class="min-w-0">
-              <p class="task-name" dir="auto">{{ item.habit.name }}</p>
-              <p class="task-details">
-                {{ item.completion ? text().done : text().pending }}
-              </p>
-            </div>
-            <button
-              #trigger
-              class="task-button"
-              [class.task-primary]="!item.completion"
-              type="button"
-              [disabled]="habits.busy()"
-              [attr.aria-label]="
-                (item.completion ? text().undo : text().complete) +
-                ' · ' +
-                item.habit.name
-              "
-              (click)="toggle(item.habit, item.completion, trigger)"
-            >
-              {{ item.completion ? text().undo : text().complete }}
-            </button>
-          </li>
+          @if (!overview()) {
+            <li>
+              <button
+                #check
+                type="button"
+                class="day-check"
+                [attr.aria-pressed]="!!item.completion"
+                [disabled]="habits.busy()"
+                [attr.aria-label]="
+                  (item.completion ? text().undo : text().complete) +
+                  ' · ' +
+                  item.habit.name
+                "
+                (click)="toggle(item.habit, item.completion, check)"
+              >
+                <span class="checkmark" aria-hidden="true">{{
+                  item.completion ? '✓' : ''
+                }}</span><span dir="auto">{{ item.habit.name }}</span>
+              </button>
+            </li>
+          } @else {
+            <li class="task-row">
+              <div class="min-w-0">
+                <p class="task-name" dir="auto">{{ item.habit.name }}</p>
+                <p class="task-details">
+                  {{ item.completion ? text().done : text().pending }}
+                </p>
+              </div>
+              <button
+                #trigger
+                class="task-button"
+                [class.task-primary]="!item.completion"
+                type="button"
+                [disabled]="habits.busy()"
+                [attr.aria-label]="
+                  (item.completion ? text().undo : text().complete) +
+                  ' · ' +
+                  item.habit.name
+                "
+                (click)="toggle(item.habit, item.completion, trigger)"
+              >
+                {{ item.completion ? text().undo : text().complete }}
+              </button>
+            </li>
+          }
         }
       </ul>
     } @else {
-      <p class="notice text-muted">{{ text().noToday }}</p>
+      <p class="notice text-muted">
+        {{ overview() ? text().noToday : text().emptyDay }}
+      </p>
     }
   </app-habit-load-state>
 </section>

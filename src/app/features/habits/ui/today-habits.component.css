@@ -1,0 +1,63 @@
+.day-summary {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin: 1.6rem 0 0.75rem;
+  color: var(--muted);
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+progress {
+  width: 6rem;
+  height: 0.3rem;
+  border: 0;
+  border-radius: 1rem;
+  background: var(--border);
+  color: var(--accent);
+  accent-color: var(--accent);
+}
+progress::-webkit-progress-bar {
+  background: var(--border);
+  border-radius: 1rem;
+}
+progress::-webkit-progress-value {
+  background: var(--accent);
+  border-radius: 1rem;
+}
+.day-list {
+  border: 0;
+  border-block-start: 1px solid var(--border);
+  border-radius: 0;
+  background: transparent;
+}
+.day-check {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  width: 100%;
+  padding: 0.95rem 0.5rem;
+  text-align: start;
+  border-bottom: 1px solid var(--border);
+  font-weight: 550;
+  overflow-wrap: anywhere;
+}
+.day-check:hover {
+  background: var(--hover);
+}
+.checkmark {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 1.45rem;
+  height: 1.45rem;
+  border: 1.5px solid var(--accent);
+  border-radius: 0.4rem;
+  background: var(--surface);
+  color: var(--surface);
+}
+[aria-pressed='true'] .checkmark {
+  background: var(--accent);
+}
+.day-check[aria-pressed='true'] {
+  color: var(--muted);
+}

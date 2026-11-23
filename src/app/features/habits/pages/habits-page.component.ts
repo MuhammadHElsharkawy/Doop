@@ -30,18 +30,92 @@ import {
   weekdayNames,
 } from '../domain/habit-rules';
 import { HabitEditorComponent } from '../ui/habit-editor.component';
+import { HabitLoadStateComponent } from '../ui/habit-load-state.component';
 import { TodayHabitsComponent } from '../ui/today-habits.component';
 
 @Component({
   selector: 'app-habits-page',
-  imports: [DialogComponent, HabitEditorComponent, TodayHabitsComponent],
+  imports: [
+    DialogComponent,
+    HabitEditorComponent,
+    TodayHabitsComponent,
+    HabitLoadStateComponent,
+  ],
   changeDetection: ChangeDetectionStrategy.OnPush,
+  styleUrl: './habits-page.component.css',
   templateUrl: './habits-page.component.html',
 })
 export class HabitsPageComponent {
   protected readonly habits = inject(HabitsService);
   protected readonly locale = inject(LocalizationService);
   protected readonly text = this.locale.habits;
+  protected readonly tab = signal<'today' | 'library'>('today');
+  protected readonly filter = signal('active');
+  protected readonly tabs = ['today', 'library'] as const;
+
+  protected tabKey(
+    event: KeyboardEvent,
+    index: number,
+    list: HTMLElement,
+  ): void {
+    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+    event.preventDefault();
+    const next = event.key === 'Home' ? 0 : event.key === 'End' ? 1 : 1 - index;
+    this.tab.set(this.tabs[next]);
+    list.querySelectorAll<HTMLButtonElement>('button')[next]?.focus();
+  }
+
+  protected menuKey(
+    event: KeyboardEvent,
+    panel: HTMLElement,
+    trigger: HTMLElement,
+  ): void {
+    const buttons = Array.from(panel.querySelectorAll('button'));
+    const index = buttons.findIndex((button) => button === event.target);
+    if (event.key === 'Escape' || event.key === 'Tab') {
+      panel.hidePopover();
+      trigger.focus();
+      if (event.key === 'Escape') event.preventDefault();
+      return;
+    }
+    if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return;
+    event.preventDefault();
+    const next =
+      event.key === 'Home'
+        ? 0
+        : event.key === 'End'
+          ? buttons.length - 1
+          : (index + (event.key === 'ArrowDown' ? 1 : -1) + buttons.length) %
+            buttons.length;
+    buttons[next]?.focus();
+  }
+
+  protected openMenu(panel: HTMLElement, trigger: HTMLElement): void {
+    if (panel.matches(':popover-open')) {
+      panel.hidePopover();
+      return;
+    }
+    panel.showPopover();
+    const bounds = trigger.getBoundingClientRect();
+    const left =
+      this.locale.language() === 'ar'
+        ? bounds.left
+        : bounds.right - panel.offsetWidth;
+    panel.style.left =
+      Math.max(
+        4,
+        Math.min(
+          left,
+          document.documentElement.clientWidth - panel.offsetWidth - 4,
+        ),
+      ) + 'px';
+    panel.style.top =
+      (bounds.bottom + panel.offsetHeight < window.innerHeight
+        ? bounds.bottom
+        : Math.max(4, bounds.top - panel.offsetHeight)) + 'px';
+    panel.querySelector('button')?.focus();
+  }
+
   protected readonly period = signal('30');
   protected readonly limit = signal(10);
   protected readonly increaseLimit = (limit: number): number => limit + 10;

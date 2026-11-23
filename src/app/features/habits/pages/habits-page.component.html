@@ -1,7 +1,9 @@
 <header class="task-heading">
   <div>
     <h1 class="page-title">{{ locale.text().habits }}</h1>
-    <p class="mt-3 text-lg text-muted">{{ text().description }}</p>
+    <time class="page-date" [attr.datetime]="habits.today()">{{
+      dateLabel(habits.today())
+    }}</time>
   </div>
   <button
     #addButton
@@ -14,162 +16,279 @@
   </button>
 </header>
 
-<div class="mt-8"><app-today-habits /></div>
-@if (habits.status() === 'ready') {
-  <div class="mt-8" #management tabindex="-1">
-    @if (feedback(); as key) {
-      @if (key === 'actionError') {
-        <p class="notice task-error mb-3" role="alert">{{ text()[key] }}</p>
-      } @else {
-        <p class="task-feedback" role="status">{{ text()[key] }}</p>
+<div
+  #tabsList
+  role="tablist"
+  [attr.aria-label]="locale.text().habits"
+  class="habit-tabs"
+>
+  @for (key of tabs; track key; let i = $index) {
+    <button
+      role="tab"
+      type="button"
+      [id]="'tab-' + key"
+      [attr.aria-controls]="'panel-' + key"
+      [attr.tabindex]="tab() === key ? 0 : -1"
+      [attr.aria-selected]="tab() === key"
+      (click)="tab.set(key)"
+      (keydown)="tabKey($event, i, tabsList)"
+    >
+      {{ key === 'today' ? text().todayTab : text().library }}
+    </button>
+  }
+</div>
+<div
+  id="panel-today"
+  role="tabpanel"
+  aria-labelledby="tab-today"
+  [hidden]="tab() !== 'today'"
+>
+  <app-today-habits />
+  @if (feedback() === 'saved') {
+    <p class="sr-only" role="status">{{ text().saved }}</p>
+  }
+</div>
+<div
+  id="panel-library"
+  role="tabpanel"
+  aria-labelledby="tab-library"
+  [hidden]="tab() !== 'library'"
+>
+  @if (habits.status() !== 'ready') {
+    <app-habit-load-state />
+  }
+  @if (habits.status() === 'ready') {
+    <div class="mt-8" #management tabindex="-1">
+      @if (feedback(); as key) {
+        @if (key === 'actionError') {
+          <p class="notice task-error mb-3" role="alert">{{ text()[key] }}</p>
+        } @else {
+          <p class="task-feedback" role="status">{{ text()[key] }}</p>
+        }
       }
-    }
-    <div class="task-field max-w-56 mb-4">
-      <label for="habit-period">{{ text().period }}</label>
-      <select
-        id="habit-period"
-        #periodInput
-        (change)="period.set(periodInput.value)"
-      >
-        <option value="7">{{ text().week }}</option>
-        <option value="30" selected>{{ text().month }}</option>
-        <option value="all">{{ text().all }}</option>
-      </select>
-    </div>
-    @for (group of groups(); track group.key) {
-      <section class="mb-8" [attr.aria-labelledby]="'habits-' + group.key">
-        <div class="task-section-heading">
-          <h2 [id]="'habits-' + group.key">
-            {{ group.title }} · {{ number(group.rows.length) }}
-          </h2>
+      <div class="tools">
+        <div class="filters">
+          @for (group of groups(); track group.key) {
+            <button
+              type="button"
+              [attr.aria-pressed]="filter() === group.key"
+              (click)="filter.set(group.key)"
+            >
+              {{
+                group.key === 'active'
+                  ? text().activeFilter
+                  : text().archivedFilter
+              }}
+              <span>{{ number(group.rows.length) }}</span>
+            </button>
+          }
         </div>
-        @if (group.rows.length) {
-          <ul class="task-list">
-            @for (item of group.rows; track item.row.habit.id) {
-              <li class="task-row">
-                <div class="min-w-0 flex-1 basis-48">
-                  <h3 class="task-name" dir="auto">
-                    {{ item.row.habit.name }}
-                  </h3>
-                  @if (item.row.habit.description; as description) {
-                    <p
-                      class="mt-1 text-sm text-muted wrap-anywhere whitespace-pre-wrap"
-                      dir="auto"
-                    >
-                      {{ description }}
-                    </p>
-                  }
-                  @if (item.current; as current) {
-                    <p class="task-details">
-                      {{ text().todaySchedule }} · {{ current }}
-                    </p>
-                  }
-                  @if (item.upcoming; as upcoming) {
-                    <p class="task-details">
-                      {{ text().nextSchedule }} · {{ upcoming.days }} ·
-                      <time [attr.datetime]="upcoming.date">{{
-                        upcoming.label
-                      }}</time>
-                    </p>
-                  }
-                  @if (!item.current && !item.upcoming) {
-                    <p class="task-details">{{ text().noSchedule }}</p>
-                  }
-                  <p class="task-details">
-                    @if (item.rate; as rate) {
-                      <strong>{{ text().rate }} · {{ rate }}</strong>
+        <div class="task-field">
+          <label class="sr-only" for="habit-period">{{ text().period }}</label>
+          <select
+            id="habit-period"
+            #periodInput
+            (change)="period.set(periodInput.value)"
+          >
+            <option value="7">{{ text().week }}</option>
+            <option value="30" selected>{{ text().month }}</option>
+            <option value="all">{{ text().all }}</option>
+          </select>
+        </div>
+      </div>
+      @for (group of groups(); track group.key) {
+        <section
+          [hidden]="filter() !== group.key"
+          class="library-list"
+          [attr.aria-labelledby]="'habits-' + group.key"
+        >
+          <div class="sr-only">
+            <h2 [id]="'habits-' + group.key">
+              {{ group.title }} · {{ number(group.rows.length) }}
+            </h2>
+          </div>
+          @if (group.rows.length) {
+            <ul class="task-list">
+              @for (item of group.rows; track item.row.habit.id) {
+                <li class="task-row">
+                  <div class="min-w-0 flex-1 basis-48">
+                    <details>
+                      <summary class="habit-name">
+                        <bdi>{{ item.row.habit.name }}</bdi>
+                      </summary>
+                      <div class="detail-body">
+                        @if (item.row.habit.description; as description) {
+                          <p
+                            class="mt-1 text-sm text-muted wrap-anywhere whitespace-pre-wrap"
+                            dir="auto"
+                          >
+                            {{ description }}
+                          </p>
+                        }
+                        <p>{{ item.occurrences }}</p>
+                        @for (entry of item.row.completions; track entry.id) {
+                          <p>
+                            <time [attr.datetime]="entry.scheduledDate">{{
+                              dateLabel(entry.scheduledDate)
+                            }}</time>
+                            · {{ text().done }}
+                          </p>
+                        }
+                      </div>
+                    </details>
+                    @if (item.current; as current) {
+                      <p class="task-details">
+                        {{ current }}
+                      </p>
                     }
-                    {{ item.occurrences }}
-                  </p>
-                </div>
-                <div class="task-row-actions">
-                  @if (group.key === 'active') {
+                    @if (item.upcoming; as upcoming) {
+                      <p class="task-details">
+                        {{ upcoming.days }} ·
+                        <time [attr.datetime]="upcoming.date">{{
+                          upcoming.label
+                        }}</time>
+                      </p>
+                    }
+                    @if (!item.current && !item.upcoming) {
+                      <p class="task-details">{{ text().noSchedule }}</p>
+                    }
+                  </div>
+                  <span
+                    class="rate"
+                    [attr.aria-label]="
+                      text().rate + ' · ' + (item.rate ?? item.occurrences)
+                    "
+                    >{{ item.rate ?? '—' }}</span
+                  >
+                  <button
+                    #trigger
+                    class="more"
+                    type="button"
+                    aria-haspopup="menu"
+                    [attr.aria-expanded]="menu.matches(':popover-open')"
+                    [attr.aria-label]="
+                      text().actions + ' · ' + item.row.habit.name
+                    "
+                    (click)="openMenu(menu, trigger)"
+                    (keydown.arrowdown)="
+                      $event.preventDefault(); openMenu(menu, trigger)
+                    "
+                  >
+                    ···
+                  </button>
+                  <div
+                    #menu
+                    popover="auto"
+                    role="menu"
+                    tabindex="-1"
+                    [attr.aria-label]="text().actions"
+                    class="context-menu"
+                    (toggle)="
+                      trigger.setAttribute(
+                        'aria-expanded',
+                        menu.matches(':popover-open') ? 'true' : 'false'
+                      )
+                    "
+                    (keydown)="menuKey($event, menu, trigger)"
+                  >
+                    @if (group.key === 'active') {
+                      <button
+                        role="menuitem"
+                        class="task-button"
+                        type="button"
+                        [disabled]="habits.busy()"
+                        [attr.aria-label]="
+                          text().edit + ' · ' + item.row.habit.name
+                        "
+                        (click)="
+                          menu.hidePopover(); editor.open(trigger, item.row)
+                        "
+                      >
+                        {{ text().edit }}
+                      </button>
+                    }
                     <button
-                      #edit
                       class="task-button"
                       type="button"
                       [disabled]="habits.busy()"
                       [attr.aria-label]="
-                        text().edit + ' · ' + item.row.habit.name
+                        (group.key === 'active'
+                          ? text().archive
+                          : text().restore) +
+                        ' · ' +
+                        item.row.habit.name
                       "
-                      (click)="editor.open(edit, item.row)"
+                      role="menuitem"
+                      (click)="
+                        menu.hidePopover(); archive(item.row.habit, management)
+                      "
                     >
-                      {{ text().edit }}
+                      {{
+                        group.key === 'active' ? text().archive : text().restore
+                      }}
                     </button>
-                  }
-                  <button
-                    class="task-button"
-                    type="button"
-                    [disabled]="habits.busy()"
-                    [attr.aria-label]="
-                      (group.key === 'active'
-                        ? text().archive
-                        : text().restore) +
-                      ' · ' +
-                      item.row.habit.name
-                    "
-                    (click)="archive(item.row.habit, management)"
-                  >
-                    {{
-                      group.key === 'active' ? text().archive : text().restore
-                    }}
-                  </button>
-                  <button
-                    #removeButton
-                    class="task-button task-danger"
-                    type="button"
-                    [disabled]="habits.busy()"
-                    [attr.aria-label]="
-                      text().remove + ' · ' + item.row.habit.name
-                    "
-                    (click)="confirmDelete(item.row.habit, removeButton)"
-                  >
-                    {{ text().remove }}
-                  </button>
-                </div>
-              </li>
-            }
-          </ul>
-        } @else {
-          <p class="notice text-muted">{{ group.empty }}</p>
-        }
-      </section>
-    }
-    <section aria-labelledby="habit-history">
-      <h2 id="habit-history" class="task-section-heading">
-        {{ text().history }}
-      </h2>
-      @if (habits.history().length) {
-        <ul class="task-list">
-          @for (item of habits.history().slice(0, limit()); track item.id) {
-            <li class="task-row">
-              <span class="task-name min-w-0" dir="auto">{{
-                item.habitNameSnapshot
-              }}</span>
-              <time
-                class="text-sm text-muted"
-                [attr.datetime]="item.scheduledDate"
-                >{{ dateLabel(item.scheduledDate) }}</time
-              >
-            </li>
+                    <button
+                      role="menuitem"
+                      class="task-button task-danger"
+                      type="button"
+                      [disabled]="habits.busy()"
+                      [attr.aria-label]="
+                        text().remove + ' · ' + item.row.habit.name
+                      "
+                      (click)="
+                        menu.hidePopover();
+                        confirmDelete(item.row.habit, trigger)
+                      "
+                    >
+                      {{ text().remove }}
+                    </button>
+                  </div>
+                </li>
+              }
+            </ul>
+          } @else {
+            <p class="notice text-muted">{{ group.empty }}</p>
           }
-        </ul>
-        @if (habits.history().length > limit()) {
-          <button
-            class="task-button mt-3"
-            type="button"
-            (click)="limit.update(increaseLimit)"
-          >
-            {{ text().more }}
-          </button>
-        }
-      } @else {
-        <p class="notice text-muted">{{ text().noHistory }}</p>
+        </section>
       }
-    </section>
-  </div>
-}
-
+      <details class="history">
+        <summary>{{ text().history }}</summary>
+        <section aria-labelledby="habit-history">
+          <h2 id="habit-history" class="sr-only">
+            {{ text().history }}
+          </h2>
+          @if (habits.history().length) {
+            <ul class="task-list">
+              @for (item of habits.history().slice(0, limit()); track item.id) {
+                <li class="task-row">
+                  <span class="task-name min-w-0" dir="auto">{{
+                    item.habitNameSnapshot
+                  }}</span>
+                  <time
+                    class="text-sm text-muted"
+                    [attr.datetime]="item.scheduledDate"
+                    >{{ dateLabel(item.scheduledDate) }}</time
+                  >
+                </li>
+              }
+            </ul>
+            @if (habits.history().length > limit()) {
+              <button
+                class="task-button mt-3"
+                type="button"
+                (click)="limit.update(increaseLimit)"
+              >
+                {{ text().more }}
+              </button>
+            }
+          } @else {
+            <p class="notice text-muted">{{ text().noHistory }}</p>
+          }
+        </section>
+      </details>
+    </div>
+  }
+</div>
 <app-habit-editor #editor (saved)="feedback.set('saved')" />
 <app-dialog
   #confirmation

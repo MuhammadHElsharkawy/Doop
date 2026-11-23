@@ -21,6 +21,7 @@ import { HabitLoadStateComponent } from './habit-load-state.component';
   selector: 'app-today-habits',
   imports: [RouterLink, HabitLoadStateComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
+  styleUrl: './today-habits.component.css',
   templateUrl: './today-habits.component.html',
 })
 export class TodayHabitsComponent {
@@ -32,14 +33,14 @@ export class TodayHabitsComponent {
   protected readonly feedback = signal<
     'completedStatus' | 'undoneStatus' | 'actionError' | null
   >(null);
+  protected readonly completed = computed(
+    () => this.habits.scheduled().filter((row) => !!row.completion).length,
+  );
   protected readonly progress = computed(() => {
     const rows = this.habits.scheduled();
     const numbers = new Intl.NumberFormat(this.locale.language());
     return this.text()
-      .progress.replace(
-        '{done}',
-        numbers.format(rows.filter(({ completion }) => !!completion).length),
-      )
+      .progress.replace('{done}', numbers.format(this.completed()))
       .replace('{total}', numbers.format(rows.length));
   });
 

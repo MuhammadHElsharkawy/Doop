@@ -1,0 +1,144 @@
+:host {
+  display: block;
+  max-inline-size: 58rem;
+  margin-inline: auto;
+}
+.page-title {
+  font-size: clamp(2.4rem, 4vw, 3.5rem);
+  line-height: 1.1;
+}
+.page-date {
+  display: block;
+  margin-block-start: 0.45rem;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+.task-heading .task-primary {
+  background: var(--accent);
+  color: var(--surface);
+  border-radius: 0.45rem;
+}
+.habit-tabs {
+  display: flex;
+  gap: 1.5rem;
+  border-bottom: 1px solid var(--border);
+  margin-block: 1.75rem 1.25rem;
+}
+.habit-tabs button {
+  min-height: 44px;
+  border-bottom: 2px solid transparent;
+  color: var(--muted);
+  font-weight: 600;
+}
+.habit-tabs [aria-selected='true'] {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+.tools,
+.filters {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+.tools {
+  justify-content: space-between;
+  gap: 0.7rem;
+  margin-bottom: 0.8rem;
+}
+.filters {
+  gap: 0.15rem;
+  padding: 0.15rem;
+  background: var(--hover);
+  border-radius: 0.45rem;
+}
+.filters button {
+  min-height: 44px;
+  padding: 0 0.65rem;
+  border-radius: 0.35rem;
+  font-size: 0.875rem;
+}
+.filters span {
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+.filters [aria-pressed='true'] {
+  background: var(--surface);
+  font-weight: 650;
+}
+.library-list .task-list,
+.history .task-list {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+.library-list .task-row {
+  padding: 0.55rem 0.25rem;
+  gap: 0.65rem;
+  border-block-end: 1px solid var(--border);
+  border-block-start: 0;
+  flex-wrap: nowrap;
+}
+.habit-name,
+.history summary {
+  cursor: pointer;
+  overflow-wrap: anywhere;
+  min-height: 44px;
+  align-content: center;
+  font-weight: 650;
+}
+.task-details {
+  margin: 0;
+}
+.detail-body {
+  font-size: 0.85rem;
+  color: var(--muted);
+  padding-block-end: 0.6rem;
+  max-block-size: 16rem;
+  overflow: auto;
+}
+.rate {
+  font-variant-numeric: tabular-nums;
+  color: var(--accent);
+  font-size: 0.88rem;
+}
+.more {
+  width: 44px;
+  height: 44px;
+  border-radius: 0.4rem;
+  font-weight: 750;
+  font-size: 1.4rem;
+}
+.more:hover,
+.habit-tabs button:hover,
+.filters button:hover,
+.context-menu button:hover {
+  background: var(--hover);
+}
+.context-menu {
+  position: fixed;
+  inset: auto;
+  margin: 0;
+  padding: 0.25rem;
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  min-width: 9rem;
+}
+.context-menu button {
+  display: flex;
+  justify-content: start;
+  width: 100%;
+  border: 0;
+  text-align: start;
+}
+.history {
+  margin-top: 1.4rem;
+  border-top: 1px solid var(--border);
+  padding-top: 0.45rem;
+  color: var(--muted);
+}
+.history summary {
+  font-size: 0.9rem;
+}

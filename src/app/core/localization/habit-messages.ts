@@ -1,5 +1,12 @@
 export const habitMessages = {
   en: {
+    todayTab: 'Today',
+    library: 'All habits',
+    actions: 'Actions',
+    activeFilter: 'Active',
+    archivedFilter: 'Archived',
+    emptyDay: 'Nothing scheduled today.',
+
     description: 'Plan your routines and see how consistently you follow them.',
     add: 'Add habit',
     edit: 'Edit habit',
@@ -65,6 +72,13 @@ export const habitMessages = {
     undoneStatus: 'Completion undone.',
   },
   ar: {
+    todayTab: 'اليوم',
+    library: 'كل العادات',
+    actions: 'إجراءات',
+    activeFilter: 'نشطة',
+    archivedFilter: 'مؤرشفة',
+    emptyDay: 'لا توجد عادات مجدولة اليوم.',
+
     description: 'خطّط لعاداتك وتابع مدى انتظامك فيها.',
     add: 'إضافة عادة',
     edit: 'تعديل العادة',

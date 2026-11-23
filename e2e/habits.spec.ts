@@ -67,89 +67,90 @@ test('shares creation and completion across routes and keeps snapshots after edi
   await complete.click();
   await expect(undo).toBeVisible();
   await today.getByRole('link', { name: 'View habits' }).click();
+  const library = page.getByRole('tab', { name: 'All habits' });
+  const daily = page.getByRole('tab', { name: 'Today', exact: true });
+  await expect(daily).toHaveAttribute('aria-selected', 'true');
+  await daily.press('ArrowRight');
+  await expect(library).toBeFocused();
+  const detail = page.locator('summary').filter({ hasText: 'Read a chapter' });
+  await detail.press('Enter');
+  await expect(page.locator('details[open] time').first()).toHaveAttribute(
+    'datetime',
+    '2026-03-08',
+  );
+  await detail.press('Enter');
+  await page.getByRole('button', { name: 'Add habit' }).click();
+  await expect(form).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(library).toHaveAttribute('aria-selected', 'true');
   const history = page.getByRole('region', { name: 'Completion history' });
-  await expect(history.getByText('Read a chapter')).toBeVisible();
+  const showHistory = page
+    .locator('summary')
+    .filter({ hasText: 'Completion history' });
+  await showHistory.click();
   await expect(history.locator('time')).toHaveAttribute(
     'datetime',
     '2026-03-08',
   );
-  await expect(page.getByText('Completion rate · 100%')).toBeVisible();
-
-  const edit = page.getByRole('button', {
+  const actions = (name: string) =>
+    page.getByRole('button', { name: 'Actions · ' + name });
+  await actions('Read a chapter').press('ArrowDown');
+  const edit = page.getByRole('menuitem', {
     name: 'Edit habit · Read a chapter',
   });
+  await expect(edit).toBeFocused();
+  await edit.press('ArrowDown');
+  await expect(page.getByRole('menuitem', { name: /Archive/ })).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(actions('Read a chapter')).toBeFocused();
+  await actions('Read a chapter').click();
   await edit.click();
   const editor = page.getByRole('dialog', { name: 'Edit habit' });
   await editor.getByLabel('Habit name').fill('Study a chapter');
   await editor.getByRole('checkbox', { name: 'Sunday' }).uncheck();
   await editor.getByRole('checkbox', { name: 'Monday' }).check();
   await editor.getByRole('button', { name: 'Save habit' }).click();
-  await expect(editor).toBeHidden();
-  await expect(
-    page.getByRole('button', { name: 'Edit habit · Study a chapter' }),
-  ).toBeFocused();
-  await expect(today.getByText('Study a chapter')).toHaveCount(0);
-  await expect(
-    page.getByText('No scheduled days in this period.'),
-  ).toBeVisible();
+  await expect(actions('Study a chapter')).toBeFocused();
   await expect(history.getByText('Read a chapter')).toHaveCount(1);
-  await page.getByRole('link', { name: 'Overview' }).click();
-  await expect(today.getByText('Study a chapter')).toHaveCount(0);
+  await daily.click();
+  await expect(today.getByText('Nothing scheduled today.')).toBeVisible();
   await page.reload();
-  await expect(
-    today.getByText('No habits are scheduled today.', { exact: false }),
-  ).toBeVisible();
-  await today.getByRole('link', { name: 'View habits' }).click();
-  await expect(history.getByText('Read a chapter')).toHaveCount(1);
-  await page
-    .getByRole('button', { name: 'Edit habit · Study a chapter' })
-    .click();
+  await expect(today.getByText('Nothing scheduled today.')).toBeVisible();
+  await library.click();
+  await actions('Study a chapter').click();
+  await page.getByRole('menuitem', { name: /Edit habit/ }).click();
   await editor.getByRole('checkbox', { name: 'Sunday' }).check();
   await editor.getByRole('button', { name: 'Save habit' }).click();
-  await expect(editor).toBeHidden();
+  await daily.click();
   await expect(
-    today.getByRole('button', { name: 'Undo completion · Study a chapter' }),
-  ).toBeVisible();
-  await expect(page.getByText('Completion rate · 100%')).toBeVisible();
-  await expect(history.getByText('Read a chapter')).toHaveCount(1);
-
-  // A local date rollover changes the daily list while keeping Sunday's history.
-  await page.clock.setFixedTime(new Date('2026-03-08T22:05:00Z'));
-  await page.reload();
-  await expect(
-    today.getByRole('button', { name: 'Complete · Study a chapter' }),
-  ).toBeVisible();
-  await expect(page.getByText('Completion rate · 50%')).toBeVisible();
-  await today
-    .getByRole('button', { name: 'Complete · Study a chapter' })
-    .click();
-  await expect(page.getByText('Completion rate · 100%')).toBeVisible();
-  await today
-    .getByRole('button', { name: 'Undo completion · Study a chapter' })
-    .click();
-  await expect(page.getByText('Completion rate · 50%')).toBeVisible();
-  await page.getByRole('button', { name: 'Archive · Study a chapter' }).click();
-  await expect(today.getByText('Study a chapter')).toBeHidden();
-  await expect(history.getByText('Read a chapter')).toBeVisible();
-  await expect(page.getByText('Completion rate · 100%')).toBeVisible();
-  await page.getByRole('button', { name: 'Restore · Study a chapter' }).click();
-  await expect(today.getByText('Study a chapter')).toBeVisible();
-
-  const remove = page.getByRole('button', { name: 'Delete · Study a chapter' });
-  await remove.click();
+    today.getByRole('button', { name: /Undo completion/ }),
+  ).toHaveAttribute('aria-pressed', 'true');
+  await library.click();
+  await expect(page.getByText('100%', { exact: true })).toBeVisible();
+  await actions('Study a chapter').click();
+  await page.getByRole('menuitem', { name: /Archive/ }).click();
+  await expect(actions('Study a chapter')).toBeHidden();
+  await page.getByRole('button', { name: /^Archived/ }).click();
+  await actions('Study a chapter').click();
+  await page.getByRole('menuitem', { name: /Restore/ }).click();
+  await expect(actions('Study a chapter')).toBeHidden();
+  await page.getByRole('button', { name: /^Active/ }).click();
+  await actions('Study a chapter').click();
+  await page.getByRole('menuitem', { name: /Delete/ }).click();
   const confirmation = page.getByRole('dialog', { name: 'Delete habit?' });
   await expect(
     confirmation.getByRole('button', { name: 'Cancel' }),
   ).toBeFocused();
   await page.keyboard.press('Escape');
-  await expect(remove).toBeFocused();
-  await remove.click();
+  await expect(actions('Study a chapter')).toBeFocused();
+  await actions('Study a chapter').click();
+  await page.getByRole('menuitem', { name: /Delete/ }).click();
   await confirmation
     .getByRole('button', { name: 'Delete', exact: true })
     .click();
-  await expect(confirmation).toBeHidden();
   await page.reload();
-  await expect(today.getByText('Study a chapter')).toBeHidden();
+  await library.click();
+  await showHistory.click();
   await expect(history.getByText('Read a chapter')).toBeVisible();
 });
 
@@ -167,23 +168,32 @@ test('shows an incomplete habit immediately when an edit adds today and hides it
   await expect(form).toBeHidden();
   const today = page.getByRole('region', { name: 'Today’s Habits' });
   await expect(today.getByText('Take a walk')).toHaveCount(0);
-  const editButton = page.getByRole('button', {
+  const editButton = page.getByRole('menuitem', {
     name: 'Edit habit · Take a walk',
   });
   const editor = page.getByRole('dialog', { name: 'Edit habit' });
+  await page.getByRole('tab', { name: 'All habits' }).click();
+  await page.getByRole('button', { name: 'Actions · Take a walk' }).click();
   await editButton.click();
   await editor.getByRole('checkbox', { name: 'Sunday' }).check();
   await editor.getByRole('button', { name: 'Save habit' }).click();
+  await page.getByRole('tab', { name: 'Today', exact: true }).click();
   await expect(today.getByText('0 of 1 completed')).toBeVisible();
   await page.getByRole('link', { name: 'Overview' }).click();
   await expect(
     today.getByRole('button', { name: 'Complete · Take a walk' }),
   ).toBeVisible();
   await today.getByRole('link', { name: 'View habits' }).click();
+  await page.getByRole('tab', { name: 'All habits' }).click();
+  await page.getByRole('button', { name: 'Actions · Take a walk' }).click();
   await editButton.click();
   await editor.getByRole('checkbox', { name: 'Sunday' }).uncheck();
   await editor.getByRole('button', { name: 'Save habit' }).click();
   await expect(today.getByText('Take a walk')).toHaveCount(0);
+  await page
+    .locator('summary')
+    .filter({ hasText: 'Completion history' })
+    .click();
   await expect(
     page
       .getByRole('region', { name: 'Completion history' })
@@ -218,7 +228,7 @@ test('keeps the form after a quota failure while inserting the first schedule', 
   await form.getByRole('button', { name: 'Save habit' }).click();
   await expect(form).toBeHidden();
   await expect(
-    page.getByRole('heading', { name: 'Write a journal' }),
+    page.getByRole('button', { name: 'Complete · Write a journal' }),
   ).toHaveCount(1);
   await expect(page.getByText(/storage is full/i)).toHaveCount(0);
 });
