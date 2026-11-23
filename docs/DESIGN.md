@@ -1,40 +1,47 @@
----
+﻿---
 version: alpha
 name: Doop
 description: A daily planning and focus workspace with the clarity of a desk planner.
 colors:
   background: '#f8faf6'
   text: '#243a34'
-  primary: '#347f6d'
+  primary: '#286957'
 typography:
   display:
     fontFamily: 'Georgia, serif'
     fontWeight: 700
   body:
     fontFamily: 'ui-sans-serif, system-ui, sans-serif'
-omitted:
-  - section: spacing
-    reason: 'The smoke page uses Tailwind spacing utilities. Shared spacing is a M1 decision.'
-  - section: rounded
-    reason: 'The smoke page has no containers or controls with rounded corners.'
-  - section: components
-    reason: 'Shared product components begin in M1.'
+rounded:
+  control: '0.5rem'
+  panel: '1rem'
+spacing:
+  control-min: '2.75rem'
+components:
+  sidebar: {}
+  navigation: {}
+  dialog:
+    textColor: '{colors.text}'
 ---
 
 # Doop design context
 
 ## Overview
 
-Doop serves students, professionals, and people building routines. Use the visual hierarchy of a desk planner so users can spot their next action at a glance. Use plain labels and keep progress feedback descriptive. The product targets English and Arabic readers across desktop and mobile browsers. See the [PRD design requirements](PRD.md#14-uiux-requirements).
+Doop serves students, professionals, and people building routines across desktop and mobile web. The workspace takes its cue from a desk planner. A quiet paper-toned canvas, ruled wordmark, and clear heading make it easy to orient yourself. Use plain labels and descriptive progress feedback. See the [PRD design requirements](PRD.md#14-uiux-requirements).
 
 ## Colors
 
-The M0 page uses warm off-white for the canvas, deep forest for text, and primary emerald for the heading's single rule. These roles come from the PRD's candidate palette. [src/styles.css](../src/styles.css) owns the runtime values in `--page-background`, `--page-text`, and `--page-accent`. Full theme and appearance tokens belong to the [M1 design foundation](03-IMPLEMENTATION-ROADMAP.md#m1--shell-and-design-foundation).
+[Global styles](../src/styles.css) own runtime tokens. The light canvas and forest text preserve the PRD's palette. The stronger light emerald keeps active text readable. Each theme defines `--theme-light` and `--theme-dark`. The browser's color scheme resolves those values into `--accent` independently of the selected theme. Active navigation, focus outlines, selected controls, and swatches resolve from these variables. Surfaces, foregrounds and borders use semantic tokens across all six themes.
 
 ## Typography
 
-The smoke page uses a serif Doop heading and local system fonts for body copy. Arabic typography belongs to M1.
+The Doop wordmark and English headings use Georgia. Body text and Arabic headings use the system stack to keep both scripts readable without external fonts.
 
 ## Layout
 
-The smoke page has a compact reading column, with spacing and type sizes set by Tailwind utilities in [the root component](../src/app/app.component.ts). It has no interactive elements. Navigation, shared controls, and product layouts begin in M1.
+Desktop keeps the destination list in a collapsible sidebar. Below 48 rem it becomes a five-item bottom navigation bar with safe-area padding. The current destination uses an edge rule, tone, and accessible page state. Settings stays in the header at both widths. The same modal becomes a bottom sheet on narrow screens.
+
+## Components
+
+Use native links and buttons. Controls keep visible keyboard focus and a minimum 44 px block size. The dialog owns focus restoration, a localized close control, the modal backdrop, and responsive sizing. Controls and navigation move with document direction. See the [interaction contract](UX-CONTRACT.md).

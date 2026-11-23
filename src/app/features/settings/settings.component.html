@@ -1,0 +1,62 @@
+<div class="grid gap-5">
+  @if (preferences.storageUnavailable()) {
+    <p class="notice" role="alert">{{ text().storageError }}</p>
+  }
+  <fieldset>
+    <legend>{{ text().appearance }}</legend>
+    <div class="choices">
+      @for (choice of appearances; track choice) {
+        <label>
+          <input
+            type="radio"
+            name="appearance"
+            [checked]="preferences.current().appearance === choice"
+            (change)="preferences.set('appearance', choice)"
+          />
+          {{ text()[choice] }}
+        </label>
+      }
+    </div>
+  </fieldset>
+
+  <fieldset>
+    <legend>{{ text().theme }}</legend>
+    <div class="choices">
+      @for (choice of themes; track choice) {
+        <label>
+          <input
+            type="radio"
+            name="theme"
+            [checked]="preferences.current().theme === choice"
+            (change)="preferences.set('theme', choice)"
+          />
+          <span
+            class="swatch"
+            [attr.data-theme]="choice"
+            aria-hidden="true"
+          ></span>
+          {{ text()[choice] }}
+        </label>
+      }
+    </div>
+  </fieldset>
+
+  <fieldset>
+    <legend>{{ text().language }}</legend>
+    <div class="choices">
+      @for (choice of languages; track choice) {
+        <label>
+          <input
+            type="radio"
+            name="language"
+            [checked]="preferences.current().language === choice"
+            (change)="preferences.set('language', choice)"
+          />
+          <span [attr.lang]="choice" dir="auto">{{
+            choice === 'en' ? 'English' : 'العربية'
+          }}</span>
+        </label>
+      }
+    </div>
+  </fieldset>
+</div>

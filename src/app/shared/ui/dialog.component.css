@@ -1,0 +1,43 @@
+dialog {
+  position: fixed;
+  margin: auto;
+  inline-size: min(100% - 2rem, 34rem);
+  max-block-size: calc(100dvh - 2rem);
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: 1.5rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-panel);
+  background: var(--surface);
+  color: var(--text);
+}
+
+dialog::backdrop {
+  background: var(--scrim);
+}
+
+.dialog-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-block-end: 1.25rem;
+}
+
+h2 {
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+@media (max-width: 47.999rem) {
+  dialog {
+    inset-block: auto 0;
+    inline-size: 100%;
+    max-inline-size: none;
+    max-block-size: calc(100dvh - max(1rem, env(safe-area-inset-top)));
+    border-radius: var(--radius-panel) var(--radius-panel) 0 0;
+    padding: 1.25rem max(1.25rem, env(safe-area-inset-right))
+      max(1.25rem, env(safe-area-inset-bottom))
+      max(1.25rem, env(safe-area-inset-left));
+  }
+}

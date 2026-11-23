@@ -1,0 +1,63 @@
+<a href="#main-content" class="skip-link" (click)="skipToMain($event)">{{
+  text().skip
+}}</a>
+<div class="workspace" [class.compact]="compact()">
+  <div class="sidebar">
+    <div class="sidebar-header">
+      <span class="wordmark" lang="en" dir="ltr">Doop</span>
+      <button
+        type="button"
+        class="icon-button sidebar-toggle"
+        [attr.aria-label]="compact() ? text().expand : text().collapse"
+        [title]="compact() ? text().expand : text().collapse"
+        [attr.aria-expanded]="!compact()"
+        aria-controls="primary-navigation"
+        (click)="toggleSidebar()"
+      >
+        <app-icon name="sidebar" />
+      </button>
+    </div>
+    <nav id="primary-navigation" [attr.aria-label]="text().navigation">
+      @for (destination of destinations; track destination) {
+        <a
+          [routerLink]="['/', destination]"
+          routerLinkActive="is-current"
+          ariaCurrentWhenActive="page"
+          [attr.title]="compact() ? text()[destination] : null"
+        >
+          <app-icon [name]="destination" />
+          <span>{{ text()[destination] }}</span>
+        </a>
+      }
+    </nav>
+  </div>
+
+  <header class="workspace-header">
+    <span class="wordmark mobile-wordmark" lang="en" dir="ltr">Doop</span>
+    <button
+      #settingsButton
+      type="button"
+      class="settings-button"
+      aria-haspopup="dialog"
+      (click)="settingsDialog.open(settingsButton)"
+    >
+      <app-icon name="settings" />
+      {{ text().settings }}
+    </button>
+  </header>
+
+  <main #main id="main-content" tabindex="-1">
+    @if (preferences.storageUnavailable()) {
+      <p class="notice mb-5" role="alert">{{ text().storageError }}</p>
+    }
+    <router-outlet (activate)="routeActivated()" />
+  </main>
+</div>
+
+<app-dialog
+  #settingsDialog
+  [heading]="text().settings"
+  [closeLabel]="text().close"
+>
+  <app-settings />
+</app-dialog>

@@ -1,6 +1,6 @@
 # Doop
 
-Doop is a local-first productivity workspace. M0 delivers the repository baseline and a single page for verifying that the Angular application starts.
+Doop is a local-first productivity workspace. M1 provides the responsive navigation shell and settings for language, appearance, and color theme. Destination pages are marked as upcoming.
 
 ## Setup
 
@@ -36,4 +36,6 @@ Open <http://localhost:4200>. On Linux, install required browser system packages
 
 Angular, CLI, and build **22.3.0**, TypeScript **6.0.3**, Tailwind CSS and its PostCSS plugin **4.3.5**, PostCSS **8.5.33**, Vitest **5.1.1**, jsdom **31.0.1**, Playwright **1.65.1**, ESLint **10.15.0**, angular-eslint **22.8.0**, typescript-eslint **8.73.0**, and Prettier **3.10.1**. The [Angular compatibility table](https://angular.dev/reference/versions) and published npm peer dependencies guided the version selection. GitHub Actions runs the same checks and exercises desktop and narrow mobile viewport configurations in headless Chromium.
 
-See [AGENTS.md](AGENTS.md), the [PRD](docs/PRD.md), the [design context](docs/DESIGN.md), and the [implementation roadmap](docs/03-IMPLEMENTATION-ROADMAP.md).
+Angular Router serves the five lazy destinations. Configure static hosting to fall back to `index.html` for direct links. The app uses a typed runtime message catalog for English and Arabic, and stores appearance, theme, and language in browser-local preferences.
+
+See [AGENTS.md](AGENTS.md), the [PRD](docs/PRD.md), the [design context](docs/DESIGN.md), the [interaction contract](docs/UX-CONTRACT.md), and the [implementation roadmap](docs/03-IMPLEMENTATION-ROADMAP.md).
