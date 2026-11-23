@@ -1,0 +1,74 @@
+<ul class="task-list" role="list">
+  @for (task of tasks(); track task.id) {
+    <li class="task-row">
+      <div class="min-w-0">
+        @if (management()) {
+          <h2 class="task-name">
+            <bdi>{{ task.title }}</bdi>
+          </h2>
+        } @else {
+          <h3 class="task-name">
+            <bdi>{{ task.title }}</bdi>
+          </h3>
+        }
+        <div class="task-details">
+          <span class="task-priority"
+            >{{ text().priority }} · {{ text()[task.priority] }}</span
+          >
+          @if (task.dueDate; as date) {
+            <span
+              >{{ text().dueDate }} ·
+              <time [attr.datetime]="date">{{ dateLabel(date) }}</time></span
+            >
+          }
+          @if (task.status === 'completed') {
+            <span>{{ text().completed }}</span>
+          } @else if (isOverdue(task, today())) {
+            <span class="task-error">{{ text().overdue }}</span>
+          }
+          @if (management() && task.expectedSessions !== null) {
+            <span>{{ progress(task) }}</span>
+          }
+        </div>
+      </div>
+      <div class="task-row-actions">
+        <button
+          #toggle
+          class="task-button"
+          type="button"
+          [disabled]="busy()"
+          [attr.aria-label]="
+            (task.status === 'pending' ? text().complete : text().reopen) +
+            ' · ' +
+            task.title
+          "
+          (click)="toggleCompletion.emit({ task, trigger: toggle })"
+        >
+          {{ task.status === 'pending' ? text().complete : text().reopen }}
+        </button>
+        @if (management()) {
+          <button
+            #editButton
+            class="task-button"
+            type="button"
+            [disabled]="busy()"
+            [attr.aria-label]="text().edit + ' · ' + task.title"
+            (click)="edit.emit({ task, trigger: editButton })"
+          >
+            {{ text().edit }}
+          </button>
+          <button
+            #removeButton
+            class="task-button task-danger"
+            type="button"
+            [disabled]="busy()"
+            [attr.aria-label]="text().delete + ' · ' + task.title"
+            (click)="remove.emit({ task, trigger: removeButton })"
+          >
+            {{ text().delete }}
+          </button>
+        }
+      </div>
+    </li>
+  }
+</ul>

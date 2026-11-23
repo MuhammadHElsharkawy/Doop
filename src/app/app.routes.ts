@@ -11,13 +11,29 @@ export type Destination = (typeof destinations)[number];
 
 export const routes: Routes = [
   { path: '', pathMatch: 'full', redirectTo: 'overview' },
-  ...destinations.map((section) => ({
-    path: section,
-    data: { section },
+  {
+    path: 'overview',
     loadComponent: () =>
-      import('./shared/layout/destination-page.component').then(
-        (module) => module.DestinationPageComponent,
+      import('./features/overview/overview-page.component').then(
+        (module) => module.OverviewPageComponent,
       ),
-  })),
+  },
+  {
+    path: 'tasks',
+    loadComponent: () =>
+      import('./features/tasks/pages/tasks-page.component').then(
+        (module) => module.TasksPageComponent,
+      ),
+  },
+  ...destinations
+    .filter((section) => section !== 'overview' && section !== 'tasks')
+    .map((section) => ({
+      path: section,
+      data: { section },
+      loadComponent: () =>
+        import('./shared/layout/destination-page.component').then(
+          (module) => module.DestinationPageComponent,
+        ),
+    })),
   { path: '**', redirectTo: 'overview' },
 ];

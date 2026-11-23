@@ -1,0 +1,117 @@
+<form
+  #form
+  novalidate
+  class="task-form"
+  (submit)="submit($event, form, dateInput)"
+  [attr.aria-busy]="saving()"
+>
+  <fieldset class="grid gap-4" [disabled]="saving()">
+    <div class="task-field">
+      <label for="task-title">{{ text().title }}</label>
+      <input
+        #title
+        id="task-title"
+        name="title"
+        dir="auto"
+        required
+        [value]="task()?.title ?? ''"
+        [attr.aria-invalid]="invalid().includes('title')"
+        [attr.aria-describedby]="
+          invalid().includes('title') ? 'task-title-error' : null
+        "
+      />
+      @if (invalid().includes('title')) {
+        <p id="task-title-error" class="task-error">{{ text().titleError }}</p>
+      }
+    </div>
+    <div class="grid gap-4 sm:grid-cols-2">
+      <div class="task-field">
+        <label for="task-priority">{{ text().priority }}</label>
+        <select
+          id="task-priority"
+          name="priority"
+          [attr.aria-invalid]="invalid().includes('priority')"
+          [attr.aria-describedby]="
+            invalid().includes('priority') ? 'task-priority-error' : null
+          "
+        >
+          @for (value of priorities; track value) {
+            <option
+              [value]="value"
+              [selected]="(task()?.priority ?? 'medium') === value"
+            >
+              {{ text()[value] }}
+            </option>
+          }
+        </select>
+        @if (invalid().includes('priority')) {
+          <p id="task-priority-error" class="task-error">
+            {{ text().priorityError }}
+          </p>
+        }
+      </div>
+      <div class="task-field">
+        <label for="task-due-date"
+          >{{ text().dueDate }}
+          <span class="text-muted">({{ text().optional }})</span></label
+        >
+        <input
+          #dateInput
+          id="task-due-date"
+          name="dueDate"
+          type="date"
+          [attr.lang]="locale.language()"
+          [value]="task()?.dueDate ?? ''"
+          [attr.aria-invalid]="invalid().includes('dueDate')"
+          [attr.aria-describedby]="
+            invalid().includes('dueDate') ? 'task-date-error' : null
+          "
+        />
+        @if (invalid().includes('dueDate')) {
+          <p id="task-date-error" class="task-error">{{ text().dateError }}</p>
+        }
+      </div>
+    </div>
+    <div class="task-field">
+      <label for="task-expected"
+        >{{ text().expectedSessions }}
+        <span class="text-muted">({{ text().optional }})</span></label
+      >
+      <input
+        id="task-expected"
+        name="expectedSessions"
+        inputmode="numeric"
+        [value]="task()?.expectedSessions ?? ''"
+        [attr.aria-invalid]="invalid().includes('expectedSessions')"
+        [attr.aria-describedby]="
+          invalid().includes('expectedSessions') ? 'task-sessions-error' : null
+        "
+      />
+      @if (invalid().includes('expectedSessions')) {
+        <p id="task-sessions-error" class="task-error">
+          {{ text().sessionsError }}
+        </p>
+      }
+    </div>
+  </fieldset>
+  @if (saveError()) {
+    <p class="task-error mt-4" role="alert">{{ text().saveError }}</p>
+  }
+  <div class="flex flex-wrap justify-end gap-2 mt-5">
+    <button
+      class="task-button"
+      type="button"
+      [disabled]="saving()"
+      (click)="cancelled.emit()"
+    >
+      {{ text().cancel }}
+    </button>
+    <button
+      class="task-button task-primary"
+      type="submit"
+      [disabled]="saving()"
+    >
+      {{ text().save }}
+    </button>
+  </div>
+</form>

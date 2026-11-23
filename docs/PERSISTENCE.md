@@ -16,6 +16,8 @@ M2 stores workspace records in the browser's `doop-workspace` IndexedDB database
 
 Components use the persistence service and repositories. Repository operations resolve after their IndexedDB transactions complete. Multi-store transactions must await only database requests while the transaction is active. The shell reports unavailable storage, blocked upgrades, and failed operations. Repository reads detect invalid records without dropping or rewriting them.
 
+Task edits, completion, reopen, and undo update the current row inside a write transaction. Deleted tasks stay in storage for historical reporting and cannot be edited or reopened. Sort and filter choices use the local `doop.tasks.view` preference key. They are presentation choices outside the workspace backup.
+
 The M1 appearance, theme, and language preferences remain in the existing localStorage adapter so the shell can apply them synchronously. Workspace settings such as timer preferences use IndexedDB. A failure in either storage system has its own notice.
 
 Schedule writes require an existing habit without a tombstone. Replacement closes the current interval and inserts the next one within one transaction. Its effective date must be later than the current interval's start. Adjacent intervals are valid.

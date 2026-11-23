@@ -137,6 +137,31 @@ class HistoricalRecords<
 }
 
 class TaskRecords extends HistoricalRecords<'tasks'> {
+  update(
+    id: string,
+    change: (current: Task) => Task | undefined,
+    action: 'edit' | 'complete' | 'reopen' | 'undo',
+  ): Promise<Task | undefined> {
+    return this.database.run(
+      ['tasks'],
+      'readwrite',
+      async (tx) => {
+        const store = tx.objectStore('tasks');
+        const value = await store.get(id);
+        if (value === undefined) return undefined;
+        const current = verify('tasks', value);
+        if (current.deletedAt !== null) return undefined;
+        const next = change(current);
+        if (!next || next.id !== id || next.deletedAt !== null)
+          return undefined;
+        if (next === current) return current;
+        await store.put(verify('tasks', next));
+        return next;
+      },
+      this.key(action, id),
+    );
+  }
+
   softDelete(id: string, deletedAt: IsoInstant): Promise<boolean> {
     return this.markDeleted(id, (record: Task) => ({
       ...record,

@@ -18,7 +18,9 @@ test('navigates all destinations with keyboard and viewport-appropriate navigati
   await page.keyboard.press('Enter');
   const main = page.getByRole('main');
   await expect(main).toBeFocused();
-  await expect(main.getByText('Available in a later milestone.')).toBeVisible();
+  await expect(
+    main.getByRole('heading', { name: 'Today’s tasks' }),
+  ).toBeVisible();
 
   const navigation = page.getByRole('navigation', { name: 'Main navigation' });
   const toggle = page.getByRole('button', { name: 'Collapse sidebar' });

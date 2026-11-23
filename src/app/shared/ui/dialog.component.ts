@@ -1,8 +1,12 @@
 import {
+  afterNextRender,
   ChangeDetectionStrategy,
   Component,
   ElementRef,
+  inject,
+  Injector,
   input,
+  output,
   viewChild,
 } from '@angular/core';
 import { IconComponent } from './icon.component';
@@ -12,7 +16,13 @@ import { IconComponent } from './icon.component';
   imports: [IconComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <dialog #panel [attr.aria-label]="heading()" (close)="restoreFocus()">
+    <dialog
+      #panel
+      [attr.aria-label]="heading()"
+      [class.full-height-sheet]="fullHeightSheet()"
+      (close)="restoreFocus()"
+      (cancel)="onCancel($event)"
+    >
       <div class="dialog-header">
         <h2>{{ heading() }}</h2>
         <button
@@ -20,7 +30,8 @@ import { IconComponent } from './icon.component';
           class="icon-button"
           [attr.aria-label]="closeLabel()"
           [title]="closeLabel()"
-          (click)="panel.close()"
+          [disabled]="busy()"
+          (click)="close()"
         >
           <app-icon name="close" />
         </button>
@@ -33,18 +44,43 @@ import { IconComponent } from './icon.component';
 export class DialogComponent {
   readonly heading = input.required<string>();
   readonly closeLabel = input.required<string>();
+  readonly busy = input(false);
+  readonly fullHeightSheet = input(false);
+  readonly closed = output<void>();
   private readonly panel =
     viewChild.required<ElementRef<HTMLDialogElement>>('panel');
   private trigger?: HTMLElement;
+  private readonly injector = inject(Injector);
 
   open(trigger: HTMLElement): void {
     this.trigger = trigger;
     this.panel().nativeElement.showModal();
   }
 
+  close(): void {
+    this.panel().nativeElement.close();
+  }
+
+  protected onCancel(event: Event): void {
+    if (this.busy()) event.preventDefault();
+  }
+
   protected restoreFocus(): void {
     if (this.panel().nativeElement.open) return;
-    this.trigger?.focus();
+    const trigger = this.trigger;
+    const fallback = trigger?.closest<HTMLElement>('main');
     this.trigger = undefined;
+    this.closed.emit();
+    afterNextRender(
+      () => {
+        if (this.panel().nativeElement.open) return;
+        const target =
+          trigger?.isConnected && !trigger.matches(':disabled')
+            ? trigger
+            : fallback;
+        target?.focus();
+      },
+      { injector: this.injector },
+    );
   }
 }

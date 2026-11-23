@@ -20,7 +20,7 @@ export class PersistenceService {
     void this.database.open().catch(() => undefined);
   }
 
-  retry(): void {
-    void this.database.retry().catch(() => undefined);
+  retry(): Promise<void> {
+    return this.database.retry().catch(() => undefined);
   }
 }

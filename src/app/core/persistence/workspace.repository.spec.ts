@@ -109,6 +109,44 @@ describe('workspace repositories', () => {
     expect(await repositories.completions.list()).toEqual([]);
   });
 
+  it('applies completion and edits to the latest task in the write transaction', async () => {
+    await repositories.tasks.add(task);
+    await Promise.all([
+      repositories.tasks.update(
+        task.id,
+        (current) => ({
+          ...current,
+          status: 'completed',
+          completedAt: now,
+          updatedAt: now,
+        }),
+        'complete',
+      ),
+      repositories.tasks.update(
+        task.id,
+        (current) => ({ ...current, title: 'New title' }),
+        'edit',
+      ),
+    ]);
+    expect(await repositories.tasks.get(task.id)).toMatchObject({
+      title: 'New title',
+      status: 'completed',
+      completedAt: now,
+    });
+    await repositories.tasks.softDelete(task.id, now);
+    await expect(
+      repositories.tasks.update(
+        task.id,
+        (current) => ({ ...current, status: 'pending', completedAt: null }),
+        'reopen',
+      ),
+    ).resolves.toBeUndefined();
+    expect(await repositories.tasks.get(task.id)).toMatchObject({
+      deletedAt: now,
+      status: 'completed',
+    });
+  });
+
   it('preserves v1 records and installs the unique index on upgrade', async () => {
     const legacy = await openDB(name, 1, {
       upgrade(database) {

@@ -45,3 +45,5 @@ Desktop keeps the destination list in a collapsible sidebar. Below 48 rem it bec
 ## Components
 
 Use native links and buttons. Controls keep visible keyboard focus and a minimum 44 px block size. The dialog owns focus restoration, a localized close control, the modal backdrop, and responsive sizing. Controls and navigation move with document direction. See the [interaction contract](UX-CONTRACT.md).
+
+Task management uses a ruled summary above one continuous list. Each row uses the shared surface, border, text, and accent roles. Overdue, validation, and delete controls use the semantic danger role with text labels. The form and Overview preview share the task row and control styles.

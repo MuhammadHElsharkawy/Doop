@@ -1,0 +1,58 @@
+<header class="task-heading">
+  <div>
+    <h1 class="page-title">{{ locale.text().overview }}</h1>
+    <p class="mt-3 text-lg text-muted">
+      {{ locale.text().overviewDescription }}
+    </p>
+  </div>
+  <button
+    #addButton
+    class="task-button task-primary"
+    type="button"
+    [disabled]="tasks.busy() || tasks.status() !== 'ready'"
+    (click)="editor.open(addButton)"
+  >
+    <span aria-hidden="true">+</span>{{ text().addTask }}
+  </button>
+</header>
+
+<section class="mt-8" aria-labelledby="today-tasks">
+  <div class="task-section-heading">
+    <h2 id="today-tasks">{{ text().todayTasks }}</h2>
+    <a class="task-button" routerLink="/tasks">{{ text().viewAll }}</a>
+  </div>
+  <app-task-load-state>
+    @if (feedback(); as key) {
+      <div class="task-feedback flex flex-wrap items-center gap-2">
+        <span role="status">{{ text()[key] }}</span>
+        @if (undoTask()) {
+          <button
+            #undoButton
+            type="button"
+            class="task-button"
+            [disabled]="tasks.busy()"
+            (click)="undo()"
+          >
+            {{ text().undo }}
+          </button>
+        }
+      </div>
+    }
+    @if (failed()) {
+      <p class="notice task-error mb-3" role="alert">
+        {{ text().actionError }}
+      </p>
+    }
+    @if (tasks.overview().length) {
+      <app-task-list
+        [tasks]="tasks.overview()"
+        [today]="tasks.today()"
+        [busy]="tasks.busy()"
+        (toggleCompletion)="complete($event.task, $event.trigger)"
+      />
+    } @else {
+      <p class="notice text-muted">{{ text().noToday }}</p>
+    }
+  </app-task-load-state>
+</section>
+<app-task-editor #editor (saved)="onSaved()" />
