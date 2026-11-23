@@ -1,0 +1,19 @@
+@import 'tailwindcss';
+
+:root {
+  --page-background: #f8faf6;
+  --page-text: #243a34;
+  --page-accent: #347f6d;
+}
+
+body {
+  background-color: var(--page-background);
+  color: var(--page-text);
+}
+
+.baseline-title {
+  border-inline-start: 0.25rem solid var(--page-accent);
+  padding-inline-start: 0.75rem;
+  font-family: Georgia, serif;
+  font-weight: 700;
+}

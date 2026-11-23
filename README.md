@@ -1,0 +1,35 @@
+# Doop
+
+Doop is a local-first productivity workspace. M0 delivers the repository baseline and a single page for verifying that the Angular application starts.
+
+## Setup
+
+Use Node.js **22.22.3** (recorded in `.nvmrc`) and npm **12.2.0**. Install dependencies from the npm lockfile and download the Chromium headless shell.
+
+```sh
+npm ci
+npx playwright install --only-shell chromium
+npm run dev
+```
+
+Open <http://localhost:4200>. On Linux, install required browser system packages with `npx playwright install --with-deps --only-shell chromium`, as CI does.
+
+## Commands
+
+| Command                | Purpose                                                               |
+| ---------------------- | --------------------------------------------------------------------- |
+| `npm run dev`          | Start the Angular development server.                                 |
+| `npm run build`        | Build static browser assets in `dist/doop/browser/`.                  |
+| `npm run typecheck`    | Check Angular templates, application TypeScript, and test TypeScript. |
+| `npm run lint`         | Lint TypeScript and Angular templates.                                |
+| `npm run format`       | Format source and tooling files.                                      |
+| `npm run format:check` | Check formatting.                                                     |
+| `npm test`             | Run the Vitest unit suite once through Angular CLI.                   |
+| `npm run test:watch`   | Watch and rerun unit tests.                                           |
+| `npm run e2e`          | Smoke-test a production-configured server on port 4201 in Chromium.   |
+
+## Toolchain
+
+Angular, CLI, and build **22.3.0**, TypeScript **6.0.3**, Tailwind CSS and its PostCSS plugin **4.3.5**, PostCSS **8.5.33**, Vitest **5.1.1**, jsdom **31.0.1**, Playwright **1.65.1**, ESLint **10.15.0**, angular-eslint **22.8.0**, typescript-eslint **8.73.0**, and Prettier **3.10.1**. The [Angular compatibility table](https://angular.dev/reference/versions) and published npm peer dependencies guided the version selection. GitHub Actions runs the same checks and exercises desktop and narrow mobile viewport configurations in headless Chromium.
+
+See [AGENTS.md](AGENTS.md), the [PRD](docs/PRD.md), the [design context](docs/DESIGN.md), and the [implementation roadmap](docs/03-IMPLEMENTATION-ROADMAP.md).

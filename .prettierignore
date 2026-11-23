@@ -1,0 +1,17 @@
+.angular/
+.npm-cache/
+.playwright-browsers/
+coverage/
+dist/
+node_modules/
+playwright-report/
+test-results/
+package-lock.json
+# Preserve the supplied product documents and their Markdown tables.
+AGENTS.md
+docs/01-TECHNICAL-ARCHITECTURE.md
+docs/02-CODING-STANDARDS.md
+docs/03-IMPLEMENTATION-ROADMAP.md
+docs/FIRST-AGENT-PROMPT.md
+docs/PRD.md
+docs/START-HERE.md

@@ -1,0 +1,9 @@
+/.angular/
+/.npm-cache/
+/.playwright-browsers/
+/dist/
+/node_modules/
+/playwright-report/
+/test-results/
+/coverage/
+*.log
