@@ -12,6 +12,7 @@ import { destinations } from './app.routes';
 import { LocalizationService } from './core/localization/localization.service';
 import { PersistenceService } from './core/persistence/persistence.service';
 import { PreferencesService } from './core/preferences/preferences.service';
+import { FocusTimerService } from './features/focus/application/focus-timer.service';
 import { SettingsComponent } from './features/settings/settings.component';
 import { DialogComponent } from './shared/ui/dialog.component';
 import { IconComponent } from './shared/ui/icon.component';
@@ -31,6 +32,10 @@ import { IconComponent } from './shared/ui/icon.component';
   styleUrl: './app.component.css',
 })
 export class AppComponent {
+  constructor() {
+    inject(FocusTimerService);
+  }
+
   protected readonly text = inject(LocalizationService).text;
   protected readonly preferences = inject(PreferencesService);
   protected readonly persistence = inject(PersistenceService);

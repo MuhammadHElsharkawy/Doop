@@ -32,8 +32,15 @@ export const routes: Routes = [
         (module) => module.HabitsPageComponent,
       ),
   },
+  {
+    path: 'focus',
+    loadComponent: () =>
+      import('./features/focus/pages/focus-page.component').then(
+        (module) => module.FocusPageComponent,
+      ),
+  },
   ...destinations
-    .filter((section) => section === 'focus' || section === 'progress')
+    .filter((section) => section === 'progress')
     .map((section) => ({
       path: section,
       data: { section },

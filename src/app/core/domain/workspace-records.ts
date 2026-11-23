@@ -62,6 +62,15 @@ export interface FocusSession extends TaskAssociation {
   status: 'completed' | 'partial';
 }
 
+export interface ActiveTimerTiming {
+  revision: string;
+  pausedAt: IsoInstant | null;
+  wallAnchor: IsoInstant;
+  elapsedAtAnchorMs: number;
+  timeZone: string | null;
+  offsetMinutes: number;
+}
+
 export interface ActiveSession extends TaskAssociation {
   id: 'active';
   sessionId: string;
@@ -71,6 +80,7 @@ export interface ActiveSession extends TaskAssociation {
   resumedAt: IsoInstant | null;
   accumulatedActiveMs: number;
   plannedDurationMs: number | null;
+  timing?: ActiveTimerTiming;
 }
 
 export interface PomodoroCycle {

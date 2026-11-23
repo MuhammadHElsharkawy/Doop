@@ -10,6 +10,7 @@ import { weekdays, type WorkspaceRecords } from '../domain/workspace-records';
 type Guard<T> = (value: unknown) => value is T;
 
 export class InvalidRecordError extends Error {}
+export class InvalidActiveSessionError extends InvalidRecordError {}
 
 export function object<T>(
   shape: { [K in keyof T]: Guard<T[K]> },
@@ -133,6 +134,82 @@ export const isPreferences = object<Preferences>({
   language: choice(...languages),
 });
 
+type Active = WorkspaceRecords['activeSession'];
+const activeFields = {
+  ...association,
+  id: choice('active'),
+  sessionId: nonblank,
+  type: choice('timer', 'stopwatch', 'short-break', 'long-break'),
+  status: choice('running', 'paused'),
+  startedAt: isIsoInstant,
+  resumedAt: nullable(isIsoInstant),
+  accumulatedActiveMs: nonnegativeInt,
+  plannedDurationMs: nullable(positiveInt),
+} satisfies { [K in keyof Omit<Active, 'timing'>]: Guard<Active[K]> };
+
+const legacyActive = object<Omit<Active, 'timing'>>(activeFields);
+const activeWithTiming = object<Required<Active>>({
+  ...activeFields,
+  timing: object<NonNullable<Active['timing']>>({
+    revision: nonblank,
+    pausedAt: nullable(isIsoInstant),
+    wallAnchor: isIsoInstant,
+    elapsedAtAnchorMs: nonnegativeInt,
+    timeZone: nullable((value): value is string => {
+      if (!nonblank(value)) return false;
+      try {
+        new Intl.DateTimeFormat('en', { timeZone: value });
+        return true;
+      } catch {
+        return false;
+      }
+    }),
+    offsetMinutes: number(
+      (value) => Number.isInteger(value) && Math.abs(value) < 1440,
+    ),
+  }),
+});
+
+function validActiveSession(value: unknown): value is Active {
+  if (!legacyActive(value) && !activeWithTiming(value)) return false;
+  const active: Active = value;
+  const { accumulatedActiveMs, plannedDurationMs, resumedAt, timing } = active;
+  if (
+    (active.status === 'running') !== (resumedAt !== null) ||
+    (active.type === 'stopwatch') !== (plannedDurationMs === null) ||
+    (active.taskId === null) !== (active.taskTitleSnapshot === null)
+  )
+    return false;
+  if (plannedDurationMs !== null && accumulatedActiveMs >= plannedDurationMs)
+    return false;
+  const earliest = Date.parse(active.startedAt) + accumulatedActiveMs;
+  if (resumedAt !== null) {
+    const resume = Date.parse(resumedAt);
+    const deadline = new Date(
+      resume + (plannedDurationMs ?? accumulatedActiveMs) - accumulatedActiveMs,
+    );
+    if (
+      resume < earliest ||
+      !Number.isFinite(deadline.getTime()) ||
+      deadline.getUTCFullYear() > 9999
+    )
+      return false;
+  }
+  if (!timing) return true;
+  if (active.type !== 'timer' || plannedDurationMs === null) return false;
+  if (active.status === 'paused') {
+    return (
+      timing.pausedAt !== null &&
+      Date.parse(timing.pausedAt) >= earliest &&
+      timing.elapsedAtAnchorMs === 0
+    );
+  }
+  return (
+    timing.pausedAt === null &&
+    timing.elapsedAtAnchorMs < plannedDurationMs - accumulatedActiveMs
+  );
+}
+
 export const recordValidators: {
   [K in keyof WorkspaceRecords]: Guard<WorkspaceRecords[K]>;
 } = {
@@ -220,23 +297,7 @@ export const recordValidators: {
         .toISOString()
         .slice(0, 10) === session.completionLocalDate,
   ),
-  activeSession: object<WorkspaceRecords['activeSession']>(
-    {
-      ...association,
-      id: choice('active'),
-      sessionId: nonblank,
-      type: choice('timer', 'stopwatch', 'short-break', 'long-break'),
-      status: choice('running', 'paused'),
-      startedAt: isIsoInstant,
-      resumedAt: nullable(isIsoInstant),
-      accumulatedActiveMs: nonnegativeInt,
-      plannedDurationMs: nullable(positiveInt),
-    },
-    (active) =>
-      (active.status === 'running') === (active.resumedAt !== null) &&
-      (active.type === 'stopwatch') === (active.plannedDurationMs === null) &&
-      (active.taskId === null) === (active.taskTitleSnapshot === null),
-  ),
+  activeSession: validActiveSession,
   cycle: object<WorkspaceRecords['cycle']>({
     id: choice('cycle'),
     completedFocusSessions: nonnegativeInt,

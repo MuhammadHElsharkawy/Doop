@@ -1452,6 +1452,11 @@ Recommended storage responsibilities:
 -   For historical consistency, persist the local completion date and
     timezone offset at completion rather than regrouping old events when
     the user travels.
+-   For a Timer deadline observed in a live document, use the device
+    timezone at observation and resolve the offset at the exact deadline.
+    For an unobserved deadline, use the timezone persisted when the
+    running segment began. Existing snapshots without timezone context
+    use UTC for this fallback.
 -   Store date-only values, such as task due dates and habit scheduled
     dates, separately from timestamps.
 -   Interpret daily boundaries using the user's local timezone.
@@ -1467,6 +1472,10 @@ Recommended storage responsibilities:
 -   Persist active Timer, Stopwatch, and break state after every meaningful
     transition. The elapsed time calculation uses timestamps, never the
     assumption that background intervals continue running.
+-   While a Timer document stays alive, measure elapsed time with its
+    monotonic clock. On reopening, recover from the persisted wall-clock
+    anchor. A browser cannot reliably distinguish time elapsed while
+    closed from a system clock adjustment made during that period.
 -   On reopening after a running Timer's deadline, mark it naturally
     completed **once**, at its scheduled deadline, and show the appropriate
     completed-session/break decision. Never create duplicate records.

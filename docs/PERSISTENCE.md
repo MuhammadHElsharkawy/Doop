@@ -30,6 +30,14 @@ The shell distinguishes connection, migration, read, invalid-record, quota, and 
 
 Focus history uses elapsed active seconds and the effective Timer target after any extensions. Completed Timer elapsed time must be positive and within less than one second of the target. Partial Timer time must be below the target. Stopwatch records require a completed outcome, no target, and at least one second of active time. The wall-clock interval may include pauses. Active time cannot exceed it by one second or more.
 
+M5 uses the existing active-session singleton. Its optional timer metadata stores a revision, pause timestamp, wall-clock recovery anchor, elapsed time at that anchor, and a time zone with a fixed-offset fallback. Older snapshots remain readable when their anchors are consistent. They acquire metadata on their next write. The database version and backup format stay at versions 3 and 2 respectively. Active timers remain outside backups.
+
+A resumed timestamp and accumulated active milliseconds derive the exact UTC deadline. Live documents advance elapsed time with a monotonic clock and re-anchor wall-clock recovery when the clocks disagree by at least one second. The checkpoint preserves both observed elapsed time and the UTC deadline. A reopened document seeds its monotonic clock once from persisted wall-clock elapsed time. Paused time never accrues.
+
+The write transaction compares the expected snapshot revision before applying a transition. It inserts history by stable session ID, advances the cycle for a new record, and clears the active snapshot atomically. Cross-tab commit notifications invalidate the local snapshot. Receivers reread IndexedDB after notifications, on foregrounding, and periodically while visible. With BroadcastChannel available, a reopened document briefly gives live peers a chance to checkpoint contrary monotonic evidence before completing from wall time. Invalid active snapshots remain in storage and block timer recovery without an automatic retry loop.
+
+Observed completion uses the device zone during observation. Unobserved completion uses the running segment's persisted zone and the offset in effect at its UTC deadline. If only an offset was captured, it remains fixed. Legacy snapshots without either zone or offset use UTC for unobserved completion.
+
 ## JSON backup
 
 The version 2 contract uses the `doop-backup` format identifier and includes an export timestamp, durable productivity collections, workspace settings, and appearance preferences. It carries the habit deletion-date field. The decoder upgrades valid version 1 payloads in memory using the same unknown-date policy. Active session and cycle state stay outside the backup. A readonly transaction captures the IndexedDB portion as one snapshot.

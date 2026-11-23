@@ -12,23 +12,32 @@ import {
   weekdayOf,
 } from '../domain/habit-history';
 import type {
+  ActiveSession,
   FocusSession,
   Habit,
   HabitCompletion,
   HabitSchedule,
+  PomodoroCycle,
   Task,
   WorkspaceRecords,
 } from '../domain/workspace-records';
 import type { Preferences } from '../preferences/preferences.service';
 import type { BackupV2 } from './backup';
-import { InvalidRecordError, recordValidators } from './record-validation';
+import {
+  InvalidActiveSessionError,
+  InvalidRecordError,
+  recordValidators,
+} from './record-validation';
 
 function verify<K extends Store>(
   store: K,
   value: unknown,
 ): WorkspaceRecords[K] {
-  if (!recordValidators[store](value))
+  if (!recordValidators[store](value)) {
+    if (store === 'activeSession')
+      throw new InvalidActiveSessionError('Invalid active focus session');
     throw new InvalidRecordError('Invalid ' + store + ' record');
+  }
   return value;
 }
 
@@ -548,6 +557,26 @@ class CompletionRecords extends DeletableRecords<'completions'> {
   }
 }
 
+export function sameFocusRevision(
+  left: ActiveSession | undefined,
+  right: ActiveSession | undefined,
+): boolean {
+  if (!left || !right) return left === right;
+  if (left.sessionId !== right.sessionId) return false;
+  if (left.timing || right.timing)
+    return left.timing?.revision === right.timing?.revision;
+  return (
+    left.startedAt === right.startedAt &&
+    left.resumedAt === right.resumedAt &&
+    left.status === right.status &&
+    left.type === right.type &&
+    left.accumulatedActiveMs === right.accumulatedActiveMs &&
+    left.plannedDurationMs === right.plannedDurationMs &&
+    left.taskId === right.taskId &&
+    left.taskTitleSnapshot === right.taskTitleSnapshot
+  );
+}
+
 export class WorkspaceRepository {
   readonly tasks;
   readonly habits;
@@ -557,6 +586,81 @@ export class WorkspaceRepository {
   readonly activeSession;
   readonly cycle;
   readonly settings;
+
+  focusSnapshot() {
+    return this.database.run(
+      ['activeSession', 'cycle'],
+      'readonly',
+      async (tx) => {
+        const [active, cycle] = await Promise.all([
+          tx.objectStore('activeSession').get('active'),
+          tx.objectStore('cycle').get('cycle'),
+        ]);
+        return {
+          active:
+            active === undefined ? undefined : verify('activeSession', active),
+          cycle: cycle === undefined ? undefined : verify('cycle', cycle),
+        };
+      },
+      'focus:read',
+    );
+  }
+
+  updateFocus(
+    expected: ActiveSession | undefined,
+    transition: (
+      active: ActiveSession | undefined,
+    ) =>
+      { active: ActiveSession | null; completion?: FocusSession } | undefined,
+    action: string,
+  ) {
+    return this.database.run(
+      ['activeSession', 'sessions', 'cycle'],
+      'readwrite',
+      async (tx) => {
+        const activeStore = tx.objectStore('activeSession');
+        const cycleStore = tx.objectStore('cycle');
+        const stored = await activeStore.get('active');
+        const storedCycle = await cycleStore.get('cycle');
+        const active =
+          stored === undefined ? undefined : verify('activeSession', stored);
+        let cycle =
+          storedCycle === undefined ? undefined : verify('cycle', storedCycle);
+        if (!sameFocusRevision(expected, active))
+          return { active, cycle, result: 'conflict' as const };
+        const next = transition(active);
+        if (!next) return { active, cycle, result: 'unchanged' as const };
+
+        if (next.completion) {
+          const completion = verify('sessions', next.completion);
+          if (next.active || active?.sessionId !== completion.id)
+            throw new InvalidRecordError(
+              'Focus completion does not match active session',
+            );
+          const sessions = tx.objectStore('sessions');
+          if ((await sessions.getKey(completion.id)) === undefined) {
+            await sessions.add(completion);
+            const count = (cycle?.completedFocusSessions ?? 0) + 1;
+            cycle = verify('cycle', {
+              id: 'cycle',
+              completedFocusSessions: count,
+              pendingBreak: count >= 4 ? 'long' : 'short',
+            } satisfies PomodoroCycle);
+            await cycleStore.put(cycle);
+          }
+        }
+        if (next.active)
+          await activeStore.put(verify('activeSession', next.active));
+        else await activeStore.delete('active');
+        return {
+          active: next.active ?? undefined,
+          cycle,
+          result: 'committed' as const,
+        };
+      },
+      'focus:' + action,
+    );
+  }
 
   constructor(private readonly database: WorkspaceDatabase) {
     this.tasks = new TaskRecords(database, 'tasks');
