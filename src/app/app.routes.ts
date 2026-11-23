@@ -25,8 +25,15 @@ export const routes: Routes = [
         (module) => module.TasksPageComponent,
       ),
   },
+  {
+    path: 'habits',
+    loadComponent: () =>
+      import('./features/habits/pages/habits-page.component').then(
+        (module) => module.HabitsPageComponent,
+      ),
+  },
   ...destinations
-    .filter((section) => section !== 'overview' && section !== 'tasks')
+    .filter((section) => section === 'focus' || section === 'progress')
     .map((section) => ({
       path: section,
       data: { section },

@@ -1,0 +1,143 @@
+<form
+  #form
+  novalidate
+  class="task-form"
+  [attr.aria-busy]="saving()"
+  (submit)="submit($event, form, start)"
+>
+  <fieldset class="grid gap-4" [disabled]="saving()">
+    <div class="task-field">
+      <label for="habit-name">{{ text().name }}</label>
+      <input
+        #nameInput
+        id="habit-name"
+        name="name"
+        dir="auto"
+        required
+        [value]="habit()?.name ?? ''"
+        [attr.aria-invalid]="invalid() === 'name'"
+        [attr.aria-describedby]="
+          invalid() === 'name' ? 'habit-name-error' : null
+        "
+      />
+      @if (invalid() === 'name') {
+        <p id="habit-name-error" class="task-error">{{ text().nameError }}</p>
+      }
+    </div>
+    <div class="task-field">
+      <label for="habit-description"
+        >{{ text().details }}
+        <span class="text-muted">({{ text().optional }})</span></label
+      >
+      <textarea
+        id="habit-description"
+        name="description"
+        dir="auto"
+        rows="3"
+        class="resize-none"
+        [value]="habit()?.description ?? ''"
+      ></textarea>
+    </div>
+    <div class="task-field">
+      <label for="habit-start">{{ text().start }}</label>
+      <input
+        #start
+        id="habit-start"
+        name="startDate"
+        type="date"
+        required
+        [attr.lang]="locale.language()"
+        [value]="initialStart()"
+        [readOnly]="locked()"
+        [attr.aria-invalid]="invalid() === 'startDate'"
+        [attr.aria-describedby]="
+          locked()
+            ? 'habit-locked-start'
+            : invalid() === 'startDate'
+              ? 'habit-start-error'
+              : null
+        "
+      />
+      @if (locked()) {
+        <p id="habit-locked-start" class="text-muted">
+          {{ text().lockedStart }}
+        </p>
+      }
+      @if (invalid() === 'startDate') {
+        <p id="habit-start-error" class="task-error">{{ text().dateError }}</p>
+      }
+    </div>
+    <fieldset>
+      <legend class="habit-legend">{{ text().schedule }}</legend>
+      <div class="flex flex-wrap gap-2">
+        <label class="habit-choice"
+          ><input
+            type="radio"
+            name="mode"
+            [checked]="daily()"
+            (change)="daily.set(true)"
+          />{{ text().daily }}</label
+        >
+        <label class="habit-choice"
+          ><input
+            type="radio"
+            name="mode"
+            [checked]="!daily()"
+            (change)="daily.set(false)"
+          />{{ text().selected }}</label
+        >
+      </div>
+    </fieldset>
+    @if (!daily()) {
+      <fieldset
+        [attr.aria-describedby]="
+          invalid() === 'weekdays' ? 'habit-days-error' : null
+        "
+      >
+        <legend class="habit-legend">{{ text().days }}</legend>
+        <div class="flex flex-wrap gap-2">
+          @for (day of ordered(); track day) {
+            <label class="habit-choice">
+              <input
+                #checkbox
+                type="checkbox"
+                name="weekdays"
+                [attr.aria-label]="dayNames()[day]"
+                [attr.aria-invalid]="invalid() === 'weekdays'"
+                [checked]="selectedDays().includes(day)"
+                (change)="toggleDay(day, checkbox.checked)"
+              />
+              <span aria-hidden="true">{{ dayLabels()[day] }}</span>
+            </label>
+          }
+        </div>
+        @if (invalid() === 'weekdays') {
+          <p id="habit-days-error" class="task-error">{{ text().daysError }}</p>
+        }
+      </fieldset>
+    }
+    @if (locked()) {
+      <p class="text-sm text-muted">{{ text().futureSchedule }}</p>
+    }
+  </fieldset>
+  @if (failed()) {
+    <p class="task-error mt-4" role="alert">{{ text().saveError }}</p>
+  }
+  <div class="flex flex-wrap justify-end gap-2 mt-5">
+    <button
+      class="task-button"
+      type="button"
+      [disabled]="saving()"
+      (click)="cancelled.emit()"
+    >
+      {{ text().cancel }}
+    </button>
+    <button
+      class="task-button task-primary"
+      type="submit"
+      [disabled]="saving()"
+    >
+      {{ text().save }}
+    </button>
+  </div>
+</form>

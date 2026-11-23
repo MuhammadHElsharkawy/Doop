@@ -1,0 +1,205 @@
+<header class="task-heading">
+  <div>
+    <h1 class="page-title">{{ locale.text().habits }}</h1>
+    <p class="mt-3 text-lg text-muted">{{ text().description }}</p>
+  </div>
+  <button
+    #addButton
+    class="task-button task-primary"
+    type="button"
+    [disabled]="habits.busy() || habits.status() !== 'ready'"
+    (click)="editor.open(addButton)"
+  >
+    <span aria-hidden="true">+</span>{{ text().add }}
+  </button>
+</header>
+
+<div class="mt-8"><app-today-habits /></div>
+@if (habits.status() === 'ready') {
+  <div class="mt-8" #management tabindex="-1">
+    @if (feedback(); as key) {
+      @if (key === 'actionError') {
+        <p class="notice task-error mb-3" role="alert">{{ text()[key] }}</p>
+      } @else {
+        <p class="task-feedback" role="status">{{ text()[key] }}</p>
+      }
+    }
+    <div class="task-field max-w-56 mb-4">
+      <label for="habit-period">{{ text().period }}</label>
+      <select
+        id="habit-period"
+        #periodInput
+        (change)="period.set(periodInput.value)"
+      >
+        <option value="7">{{ text().week }}</option>
+        <option value="30" selected>{{ text().month }}</option>
+        <option value="all">{{ text().all }}</option>
+      </select>
+    </div>
+    @for (group of groups(); track group.key) {
+      <section class="mb-8" [attr.aria-labelledby]="'habits-' + group.key">
+        <div class="task-section-heading">
+          <h2 [id]="'habits-' + group.key">
+            {{ group.title }} · {{ number(group.rows.length) }}
+          </h2>
+        </div>
+        @if (group.rows.length) {
+          <ul class="task-list">
+            @for (item of group.rows; track item.row.habit.id) {
+              <li class="task-row">
+                <div class="min-w-0 flex-1 basis-48">
+                  <h3 class="task-name" dir="auto">
+                    {{ item.row.habit.name }}
+                  </h3>
+                  @if (item.row.habit.description; as description) {
+                    <p
+                      class="mt-1 text-sm text-muted wrap-anywhere whitespace-pre-wrap"
+                      dir="auto"
+                    >
+                      {{ description }}
+                    </p>
+                  }
+                  @if (item.current; as current) {
+                    <p class="task-details">
+                      {{ text().todaySchedule }} · {{ current }}
+                    </p>
+                  }
+                  @if (item.upcoming; as upcoming) {
+                    <p class="task-details">
+                      {{ text().nextSchedule }} · {{ upcoming.days }} ·
+                      <time [attr.datetime]="upcoming.date">{{
+                        upcoming.label
+                      }}</time>
+                    </p>
+                  }
+                  @if (!item.current && !item.upcoming) {
+                    <p class="task-details">{{ text().noSchedule }}</p>
+                  }
+                  <p class="task-details">
+                    @if (item.rate; as rate) {
+                      <strong>{{ text().rate }} · {{ rate }}</strong>
+                    }
+                    {{ item.occurrences }}
+                  </p>
+                </div>
+                <div class="task-row-actions">
+                  @if (group.key === 'active') {
+                    <button
+                      #edit
+                      class="task-button"
+                      type="button"
+                      [disabled]="habits.busy()"
+                      [attr.aria-label]="
+                        text().edit + ' · ' + item.row.habit.name
+                      "
+                      (click)="editor.open(edit, item.row)"
+                    >
+                      {{ text().edit }}
+                    </button>
+                  }
+                  <button
+                    class="task-button"
+                    type="button"
+                    [disabled]="habits.busy()"
+                    [attr.aria-label]="
+                      (group.key === 'active'
+                        ? text().archive
+                        : text().restore) +
+                      ' · ' +
+                      item.row.habit.name
+                    "
+                    (click)="archive(item.row.habit, management)"
+                  >
+                    {{
+                      group.key === 'active' ? text().archive : text().restore
+                    }}
+                  </button>
+                  <button
+                    #removeButton
+                    class="task-button task-danger"
+                    type="button"
+                    [disabled]="habits.busy()"
+                    [attr.aria-label]="
+                      text().remove + ' · ' + item.row.habit.name
+                    "
+                    (click)="confirmDelete(item.row.habit, removeButton)"
+                  >
+                    {{ text().remove }}
+                  </button>
+                </div>
+              </li>
+            }
+          </ul>
+        } @else {
+          <p class="notice text-muted">{{ group.empty }}</p>
+        }
+      </section>
+    }
+    <section aria-labelledby="habit-history">
+      <h2 id="habit-history" class="task-section-heading">
+        {{ text().history }}
+      </h2>
+      @if (habits.history().length) {
+        <ul class="task-list">
+          @for (item of habits.history().slice(0, limit()); track item.id) {
+            <li class="task-row">
+              <span class="task-name min-w-0" dir="auto">{{
+                item.habitNameSnapshot
+              }}</span>
+              <time
+                class="text-sm text-muted"
+                [attr.datetime]="item.scheduledDate"
+                >{{ dateLabel(item.scheduledDate) }}</time
+              >
+            </li>
+          }
+        </ul>
+        @if (habits.history().length > limit()) {
+          <button
+            class="task-button mt-3"
+            type="button"
+            (click)="limit.update(increaseLimit)"
+          >
+            {{ text().more }}
+          </button>
+        }
+      } @else {
+        <p class="notice text-muted">{{ text().noHistory }}</p>
+      }
+    </section>
+  </div>
+}
+
+<app-habit-editor #editor (saved)="feedback.set('saved')" />
+<app-dialog
+  #confirmation
+  [heading]="text().deleteTitle"
+  [closeLabel]="locale.text().close"
+  [busy]="deletingBusy()"
+  (closed)="deleting.set(null)"
+>
+  <p class="task-name" dir="auto">{{ deleting()?.name }}</p>
+  <p class="mt-2">{{ text().deleteMessage }}</p>
+  @if (deleteError()) {
+    <p class="task-error mt-3" role="alert">{{ text().actionError }}</p>
+  }
+  <div class="flex flex-wrap justify-end gap-2 mt-5">
+    <button
+      #cancelDelete
+      class="task-button"
+      type="button"
+      [disabled]="deletingBusy()"
+      (click)="confirmation.close()"
+    >
+      {{ text().cancel }}
+    </button>
+    <button
+      class="task-button task-danger"
+      type="button"
+      [disabled]="deletingBusy()"
+      (click)="remove()"
+    >
+      {{ text().remove }}
+    </button>
+  </div>
+</app-dialog>

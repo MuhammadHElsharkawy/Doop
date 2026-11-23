@@ -22,6 +22,10 @@ The M1 appearance, theme, and language preferences remain in the existing localS
 
 Schedule writes require an existing habit without a tombstone. Replacement closes the current interval and inserts the next one within one transaction. Its effective date must be later than the current interval's start. Adjacent intervals are valid.
 
+M4 creates the habit and initial schedule together. Edits commit habit details and the schedule change together. Edited weekdays apply from the current local date, or from the habit's start date if it is still in the future. If an older version covers today, it closes at today's exclusive boundary. Versions beginning today or later are superseded, including pending changes saved under the earlier next-day rule. Repeated edits on the same date update the version in place. Eligibility before today remains intact. The start date stays fixed once the habit has begun.
+
+Schedule edits do not write to the completion store. History keeps all completion snapshots, while completion rates count a record only when its date is eligible under the effective schedule and habit activity rules. Restoring eligibility makes the same record count again. Archive and restore open and close a local-date interval. Completion writes check the live habit, effective schedule, and unique occurrence in the same transaction. Undo checks the stored occurrence ID. Archived and deleted habits retain completion snapshots.
+
 The shell distinguishes connection, migration, read, invalid-record, quota, and other write failures. Retrying a read reruns validation. Writes require repeating the original action and clear its warning after the matching transaction commits.
 
 Focus history uses elapsed active seconds and the effective Timer target after any extensions. Completed Timer elapsed time must be positive and within less than one second of the target. Partial Timer time must be below the target. Stopwatch records require a completed outcome, no target, and at least one second of active time. The wall-clock interval may include pauses. Active time cannot exceed it by one second or more.

@@ -1,6 +1,21 @@
 import type { LocalDate } from '../clock/local-date';
 import type { Habit, HabitSchedule } from './workspace-records';
 
+export function weekdayOf(date: LocalDate): HabitSchedule['weekdays'][number] {
+  // Use the date label directly. The viewer's time zone must not shift its weekday.
+  return new Date(date).getUTCDay() as HabitSchedule['weekdays'][number];
+}
+
+export function scheduleOn(
+  schedules: readonly HabitSchedule[],
+  date: LocalDate,
+): HabitSchedule | undefined {
+  return schedules.find(
+    ({ effectiveFrom, effectiveTo }) =>
+      effectiveFrom <= date && (effectiveTo === null || date < effectiveTo),
+  );
+}
+
 export function habitActivityOn(
   habit: Habit,
   date: LocalDate,

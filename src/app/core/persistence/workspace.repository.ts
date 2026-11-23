@@ -4,10 +4,17 @@ import {
   type LocalDate,
 } from '../clock/local-date';
 import type { Store, WorkspaceDatabase } from '../database/workspace-database';
-import { nonOverlappingSchedules } from '../domain/habit-history';
+import {
+  habitActivityOn,
+  nonOverlappingSchedules,
+  scheduleOn,
+  validScheduleHistory,
+  weekdayOf,
+} from '../domain/habit-history';
 import type {
   FocusSession,
   Habit,
+  HabitCompletion,
   HabitSchedule,
   Task,
   WorkspaceRecords,
@@ -172,6 +179,176 @@ class TaskRecords extends HistoricalRecords<'tasks'> {
 }
 
 class HabitRecords extends HistoricalRecords<'habits'> {
+  readHistory() {
+    return this.database.run(
+      ['habits', 'schedules', 'completions'],
+      'readonly',
+      async (tx) => {
+        const [habits, schedules, completions] = await Promise.all([
+          tx.objectStore('habits').getAll(),
+          tx.objectStore('schedules').getAll(),
+          tx.objectStore('completions').getAll(),
+        ]);
+        const history = {
+          habits: habits.map((row) => verify('habits', row)),
+          schedules: schedules.map((row) => verify('schedules', row)),
+          completions: completions.map((row) => verify('completions', row)),
+        };
+        if (!validScheduleHistory(history.habits, history.schedules))
+          throw new InvalidRecordError('Invalid habit schedule history');
+        return history;
+      },
+      this.key('readHistory'),
+    );
+  }
+
+  async createWithSchedule(
+    habit: Habit,
+    schedule: HabitSchedule,
+  ): Promise<void> {
+    verify('habits', habit);
+    verify('schedules', schedule);
+    if (
+      schedule.habitId !== habit.id ||
+      schedule.effectiveFrom !== habit.startDate ||
+      schedule.effectiveTo !== null ||
+      habit.deletedAt !== null ||
+      habit.status !== 'active'
+    )
+      throw new DOMException(
+        'Invalid initial habit schedule',
+        'ConstraintError',
+      );
+    await this.database.run(
+      ['habits', 'schedules'],
+      'readwrite',
+      async (tx) => {
+        await tx.objectStore('habits').add(habit);
+        await tx.objectStore('schedules').add(schedule);
+      },
+      this.key('createWithSchedule', habit.id),
+    );
+  }
+
+  async editWithSchedule(
+    original: Habit,
+    next: Pick<Habit, 'name' | 'description' | 'startDate'>,
+    weekdays: HabitSchedule['weekdays'],
+    scheduleId: string,
+    today: LocalDate,
+    now: IsoInstant,
+  ): Promise<void> {
+    await this.database.run(
+      ['habits', 'schedules'],
+      'readwrite',
+      async (tx) => {
+        const habits = tx.objectStore('habits');
+        const value = await habits.get(original.id);
+        const current = requireLiveHabit(value);
+        if (
+          current.updatedAt !== original.updatedAt ||
+          (current.startDate <= today && next.startDate !== current.startDate)
+        )
+          throw new DOMException(
+            'Habit details changed while editing',
+            'ConstraintError',
+          );
+
+        const schedules = tx.objectStore('schedules');
+        const history = (
+          await schedules.index('byHabit').getAll(current.id)
+        ).map((row) => verify('schedules', row));
+        if (!nonOverlappingSchedules(history))
+          throw new InvalidRecordError('Invalid habit schedule history');
+        const open = history.find((row) => row.effectiveTo === null);
+        if (
+          next.startDate !== current.startDate &&
+          history.some((row) => row.effectiveFrom <= today)
+        )
+          throw new DOMException(
+            'Cannot change a start date with schedule history',
+            'ConstraintError',
+          );
+        if (
+          !open ||
+          next.startDate !== current.startDate ||
+          weekdays.length !== open.weekdays.length ||
+          weekdays.some((day) => !open.weekdays.includes(day))
+        ) {
+          const effectiveFrom = next.startDate > today ? next.startDate : today;
+          const replaced = history.filter((row) => row.effectiveFrom >= today);
+          const reusable =
+            replaced.find((row) => row.effectiveFrom === effectiveFrom) ??
+            replaced.find((row) => row.id === open?.id);
+          const previous = scheduleOn(history, today);
+          const schedule = verify('schedules', {
+            id: reusable?.id ?? scheduleId,
+            habitId: current.id,
+            weekdays,
+            effectiveFrom,
+            effectiveTo: null,
+            createdAt: now,
+          });
+          // Keep the historical prefix, including the part of an older version
+          // before today. Same-day and pending versions can be superseded.
+          if (previous && previous.effectiveFrom < today)
+            await schedules.put({ ...previous, effectiveTo: today });
+          for (const row of replaced)
+            if (row.id !== reusable?.id) await schedules.delete(row.id);
+          if (reusable) await schedules.put(schedule);
+          else await schedules.add(schedule);
+        }
+        await habits.put(
+          verify('habits', { ...current, ...next, updatedAt: now }),
+        );
+      },
+      this.key('editWithSchedule', original.id),
+    );
+  }
+
+  async setArchived(
+    id: string,
+    archived: boolean,
+    today: LocalDate,
+    now: IsoInstant,
+  ): Promise<void> {
+    await this.database.run(
+      ['habits'],
+      'readwrite',
+      async (tx) => {
+        const store = tx.objectStore('habits');
+        const habit = requireLiveHabit(await store.get(id));
+        if ((habit.status === 'archived') === archived) return;
+        const last = habit.archivePeriods.at(-1);
+        if (last && today < (last.until ?? last.from))
+          throw new DOMException(
+            'Archive change precedes previous history',
+            'ConstraintError',
+          );
+        const archivePeriods = [...habit.archivePeriods];
+        if (archived) {
+          archivePeriods.push({ from: today, until: null });
+        } else {
+          if (!last) throw new InvalidRecordError('Missing archive period');
+          archivePeriods[archivePeriods.length - 1] = {
+            from: last.from,
+            until: today,
+          };
+        }
+        await store.put(
+          verify('habits', {
+            ...habit,
+            archivePeriods,
+            archivedAt: archived ? now : null,
+            status: archived ? 'archived' : 'active',
+            updatedAt: now,
+          }),
+        );
+      },
+      this.key(archived ? 'archive' : 'restore', id),
+    );
+  }
+
   async softDelete(
     id: string,
     deletedAt: IsoInstant,
@@ -188,13 +365,15 @@ class HabitRecords extends HistoricalRecords<'habits'> {
   }
 }
 
-function requireLiveHabit(value: unknown): void {
-  if (value === undefined || verify('habits', value).deletedAt !== null) {
+function requireLiveHabit(value: unknown): Habit {
+  const habit = value === undefined ? undefined : verify('habits', value);
+  if (!habit || habit.deletedAt !== null) {
     throw new DOMException(
       'Schedule requires a habit that has not been deleted',
       'ConstraintError',
     );
   }
+  return habit;
 }
 
 class ScheduleRecords extends Records<'schedules'> {
@@ -295,6 +474,61 @@ class SessionRecords extends DeletableRecords<'sessions'> {
 }
 
 class CompletionRecords extends DeletableRecords<'completions'> {
+  setOccurrence(
+    habitId: string,
+    date: LocalDate,
+    change:
+      | { complete: true; id: string; now: IsoInstant }
+      | { complete: false; id: string },
+  ): Promise<void> {
+    return this.database.run(
+      ['habits', 'schedules', 'completions'],
+      'readwrite',
+      async (tx) => {
+        const habit = requireLiveHabit(
+          await tx.objectStore('habits').get(habitId),
+        );
+        const schedules = (
+          await tx.objectStore('schedules').index('byHabit').getAll(habitId)
+        ).map((row) => verify('schedules', row));
+        const scheduled = scheduleOn(schedules, date)?.weekdays.includes(
+          weekdayOf(date),
+        );
+        if (
+          habit.status !== 'active' ||
+          habitActivityOn(habit, date) !== 'active' ||
+          !scheduled
+        )
+          throw new DOMException(
+            'Habit is not scheduled on that date',
+            'ConstraintError',
+          );
+        const store = tx.objectStore('completions');
+        const value = await store.index('byOccurrence').get([habitId, date]);
+        const current =
+          value === undefined ? undefined : verify('completions', value);
+        if (change.complete && !current) {
+          const completion: HabitCompletion = {
+            id: change.id,
+            habitId,
+            habitNameSnapshot: habit.name,
+            scheduledDate: date,
+            completedAt: change.now,
+          };
+          await store.add(verify('completions', completion));
+        } else if (!change.complete && current?.id === change.id) {
+          await store.delete(current.id);
+        } else if (!change.complete && current) {
+          throw new DOMException(
+            'Completion changed before undo',
+            'ConstraintError',
+          );
+        }
+      },
+      this.key(change.complete ? 'complete' : 'undo', habitId, date),
+    );
+  }
+
   async getOccurrence(
     habitId: string,
     date: LocalDate,

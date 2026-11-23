@@ -55,4 +55,22 @@
     }
   </app-task-load-state>
 </section>
+<div class="mt-8"><app-today-habits [overview]="true" /></div>
+<div class="flex flex-wrap items-center gap-3 mt-3">
+  <button
+    #addHabit
+    class="task-button task-primary"
+    type="button"
+    [disabled]="habits.busy() || habits.status() !== 'ready'"
+    (click)="habitSaved.set(false); habitEditor.open(addHabit)"
+  >
+    <span aria-hidden="true">+</span>{{ locale.habits().add }}
+  </button>
+  @if (habitSaved()) {
+    <span class="text-sm text-muted" role="status">{{
+      locale.habits().saved
+    }}</span>
+  }
+</div>
 <app-task-editor #editor (saved)="onSaved()" />
+<app-habit-editor #habitEditor (saved)="habitSaved.set(true)" />

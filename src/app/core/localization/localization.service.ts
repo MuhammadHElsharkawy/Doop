@@ -1,6 +1,7 @@
 import { Injectable, computed, inject } from '@angular/core';
 import { PreferencesService } from '../preferences/preferences.service';
 import { taskMessages } from './task-messages';
+import { habitMessages } from './habit-messages';
 
 const en = {
   overview: 'Overview',
@@ -113,4 +114,5 @@ export class LocalizationService {
   readonly text = computed(() => messages[this.preferences.current().language]);
   readonly language = computed(() => this.preferences.current().language);
   readonly tasks = computed(() => taskMessages[this.language()]);
+  readonly habits = computed(() => habitMessages[this.language()]);
 }

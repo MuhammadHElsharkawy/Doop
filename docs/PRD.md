@@ -651,6 +651,8 @@ destination.
 -   Start date defaults to the current local date.
 -   A schedule is required.
 -   Users can edit habit details and schedules.
+-   Schedule changes apply immediately from the current local date. A
+    habit with a future start date remains inactive until that date.
 -   Reminder notifications are not part of the MVP.
 
 ### 7.5 Habit Completion
@@ -676,13 +678,15 @@ Requirements:
 -   Preserve historical records when a habit is archived or deleted.
 -   Historical records must retain a habit name snapshot so they remain
     understandable if the original habit is deleted.
--   Editing a schedule must not rewrite past completion records.
+-   Editing a schedule preserves every completion record, including a
+    completion for today if the new schedule excludes today.
 
 To calculate historical completion rates correctly after schedule
 changes, the application must retain the effective schedule for each
-date. Schedule changes should create a new schedule version with an
-effective start date rather than rewriting the previous schedule
-history.
+date. Schedule edits preserve eligibility for dates before today.
+Repeated edits on the same local date use one effective schedule
+version for that date. Overview reflects the edited schedule
+immediately.
 
 ### 7.7 Habit Consistency Metrics
 
@@ -691,6 +695,9 @@ recent completion history. Completion rate is completed scheduled
 occurrences divided by eligible scheduled occurrences in the selected
 period, excluding future dates and inactive/archived periods. A zero
 denominator displays a neutral empty state rather than a percentage.
+If the schedule changes to exclude today, an existing completion still
+appears in history and is excluded from scheduled completion totals. If
+another edit includes today again, the same completion counts once.
 
 Current/best streaks are deferred to a later release. If added later,
 streaks must use consecutive scheduled occurrences, not calendar days.

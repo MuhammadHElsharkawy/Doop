@@ -13,6 +13,9 @@ import { Title } from '@angular/platform-browser';
 import { RouterLink } from '@angular/router';
 import type { Task } from '../../core/domain/workspace-records';
 import { LocalizationService } from '../../core/localization/localization.service';
+import { HabitsService } from '../habits/application/habits.service';
+import { HabitEditorComponent } from '../habits/ui/habit-editor.component';
+import { TodayHabitsComponent } from '../habits/ui/today-habits.component';
 import { TasksService } from '../tasks/application/tasks.service';
 import { TaskEditorComponent } from '../tasks/ui/task-editor.component';
 import { TaskListComponent } from '../tasks/ui/task-list.component';
@@ -25,12 +28,16 @@ import { TaskLoadStateComponent } from '../tasks/ui/task-load-state.component';
     TaskEditorComponent,
     TaskListComponent,
     TaskLoadStateComponent,
+    HabitEditorComponent,
+    TodayHabitsComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './overview-page.component.html',
 })
 export class OverviewPageComponent {
   protected readonly tasks = inject(TasksService);
+  protected readonly habits = inject(HabitsService);
+  protected readonly habitSaved = signal(false);
   protected readonly locale = inject(LocalizationService);
   protected readonly text = this.locale.tasks;
   protected readonly undoTask = signal<Task | undefined>(undefined);
