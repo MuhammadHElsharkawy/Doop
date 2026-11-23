@@ -196,7 +196,6 @@ function validActiveSession(value: unknown): value is Active {
       return false;
   }
   if (!timing) return true;
-  if (active.type !== 'timer' || plannedDurationMs === null) return false;
   if (active.status === 'paused') {
     return (
       timing.pausedAt !== null &&
@@ -206,8 +205,60 @@ function validActiveSession(value: unknown): value is Active {
   }
   return (
     timing.pausedAt === null &&
-    timing.elapsedAtAnchorMs < plannedDurationMs - accumulatedActiveMs
+    (plannedDurationMs === null ||
+      timing.elapsedAtAnchorMs < plannedDurationMs - accumulatedActiveMs)
   );
+}
+
+const cycleFields = {
+  id: choice('cycle' as const),
+  completedFocusSessions: nonnegativeInt,
+  pendingBreak: nullable(choice('short' as const, 'long' as const)),
+};
+type Cycle = WorkspaceRecords['cycle'];
+const legacyCycle = object<Omit<Cycle, 'revision'>>(cycleFields);
+const versionedCycle = object<Required<Cycle>>({
+  ...cycleFields,
+  revision: nonblank,
+});
+
+const legacySettings = object<WorkspaceRecords['settings']>({
+  id: choice('settings'),
+  weekStartsOn: nullable(choice(0, 1, 6)),
+  dailyGoal: positiveInt,
+  focusDurationMinutes: number(
+    (value) => value >= 5 && value <= 480 && value % 5 === 0,
+  ),
+  shortBreakDurationMinutes: positiveInt,
+  longBreakDurationMinutes: positiveInt,
+  focusSessionsBeforeLongBreak: positiveInt,
+  breakTransition: choice('automatic', 'manual'),
+  ambientSound: nullable(
+    choice('rain', 'coffee-shop', 'ocean-waves', 'forest'),
+  ),
+  ambientVolume: number((value) => value >= 0 && value <= 100),
+});
+
+export function recoverLegacySettings(
+  value: unknown,
+): WorkspaceRecords['settings'] {
+  if (!legacySettings(value))
+    throw new InvalidRecordError('Invalid settings record');
+  return {
+    ...value,
+    shortBreakDurationMinutes:
+      value.shortBreakDurationMinutes <= 60
+        ? value.shortBreakDurationMinutes
+        : 5,
+    longBreakDurationMinutes:
+      value.longBreakDurationMinutes <= 120
+        ? value.longBreakDurationMinutes
+        : 15,
+    focusSessionsBeforeLongBreak:
+      value.focusSessionsBeforeLongBreak <= 12
+        ? value.focusSessionsBeforeLongBreak
+        : 4,
+  };
 }
 
 export const recordValidators: {
@@ -298,11 +349,7 @@ export const recordValidators: {
         .slice(0, 10) === session.completionLocalDate,
   ),
   activeSession: validActiveSession,
-  cycle: object<WorkspaceRecords['cycle']>({
-    id: choice('cycle'),
-    completedFocusSessions: nonnegativeInt,
-    pendingBreak: nullable(choice('short', 'long')),
-  }),
+  cycle: (value): value is Cycle => legacyCycle(value) || versionedCycle(value),
   settings: object<WorkspaceRecords['settings']>({
     id: choice('settings'),
     weekStartsOn: nullable(choice(0, 1, 6)),
@@ -310,9 +357,15 @@ export const recordValidators: {
     focusDurationMinutes: number(
       (value) => value >= 5 && value <= 480 && value % 5 === 0,
     ),
-    shortBreakDurationMinutes: positiveInt,
-    longBreakDurationMinutes: positiveInt,
-    focusSessionsBeforeLongBreak: positiveInt,
+    shortBreakDurationMinutes: number(
+      (value) => Number.isSafeInteger(value) && value >= 1 && value <= 60,
+    ),
+    longBreakDurationMinutes: number(
+      (value) => Number.isSafeInteger(value) && value >= 1 && value <= 120,
+    ),
+    focusSessionsBeforeLongBreak: number(
+      (value) => Number.isSafeInteger(value) && value >= 1 && value <= 12,
+    ),
     breakTransition: choice('automatic', 'manual'),
     ambientSound: nullable(
       choice('rain', 'coffee-shop', 'ocean-waves', 'forest'),

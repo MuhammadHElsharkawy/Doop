@@ -8,7 +8,10 @@ import {
   signal,
   untracked,
 } from '@angular/core';
-import type { ActiveSession } from '../../../core/domain/workspace-records';
+import type {
+  ActiveSession,
+  WorkspaceSettings,
+} from '../../../core/domain/workspace-records';
 import { createRecordId } from '../../../core/domain/record-id';
 import { PersistenceService } from '../../../core/persistence/persistence.service';
 import { InvalidActiveSessionError } from '../../../core/persistence/record-validation';
@@ -16,6 +19,7 @@ import { sameFocusRevision } from '../../../core/persistence/workspace.repositor
 import {
   clockDisagrees,
   elapsedSinceResume,
+  elapsedActiveMs,
   focusDurationMs,
   localZone,
   recoveryAnchor,
@@ -23,9 +27,13 @@ import {
   transitionTimer,
   type ClockSample,
   type RunningAnchor,
-  type TimerChange,
   type TimerCommand,
+  type TimerInput,
 } from '../domain/focus-timer';
+import {
+  defaultFocusSettings,
+  type BreakSettings,
+} from '../domain/focus-settings';
 
 @Injectable({ providedIn: 'root' })
 export class FocusTimerService {
@@ -40,6 +48,7 @@ export class FocusTimerService {
   private readonly failure = signal<(() => Promise<void>) | null>(null);
   private readonly invalid = signal(false);
   private readonly conflict = signal(false);
+  private readonly failedAction = signal<TimerCommand['type'] | null>(null);
   private anchor?: RunningAnchor;
   private observedAt?: number;
   private confirmRecoveryAfter?: number;
@@ -55,17 +64,34 @@ export class FocusTimerService {
 
   readonly busy = this.working.asReadonly();
   readonly hasError = computed(() => this.failure() !== null);
+  readonly resumeFailed = computed(
+    () => this.hasError() && this.failedAction() === 'resume',
+  );
   readonly changedElsewhere = this.conflict.asReadonly();
+  readonly active = computed(() => this.snapshot()?.active);
+  readonly settings = computed(
+    () => this.snapshot()?.settings ?? defaultFocusSettings,
+  );
+  readonly pendingBreak = computed(() =>
+    this.active() ? null : (this.snapshot()?.cycle?.pendingBreak ?? null),
+  );
+  readonly onBreak = computed(() => {
+    const type = this.active()?.type;
+    return type === 'short-break' || type === 'long-break';
+  });
   readonly phase = computed(() => {
     if (this.invalid()) return 'invalid';
     const state = this.snapshot();
     if (!state) return 'loading';
-    if (state.active && state.active.type !== 'timer') return 'unavailable';
     return (
       state.active?.status ?? (state.cycle?.pendingBreak ? 'completed' : 'idle')
     );
   });
-  readonly seconds = computed(() => Math.ceil(this.remaining() / 1000));
+  readonly seconds = computed(() =>
+    this.active()?.type === 'stopwatch'
+      ? Math.floor(this.remaining() / 1000)
+      : Math.ceil(this.remaining() / 1000),
+  );
 
   constructor() {
     const visible = () => {
@@ -106,21 +132,28 @@ export class FocusTimerService {
     void this.sync();
   }
 
-  activate(): void {
+  activate(mode: 'timer' | 'stopwatch'): void {
     if (
       this.busy() ||
       this.hasError() ||
       this.invalid() ||
-      (this.confirmRecoveryAfter !== undefined && this.remaining() === 0)
+      this.confirmRecoveryAfter !== undefined
     )
       return;
     const active = this.snapshot()?.active;
     if (this.phase() === 'idle' || this.phase() === 'completed')
       this.command(
-        { type: 'start', sessionId: createRecordId() },
+        {
+          type: this.pendingBreak()
+            ? 'start-break'
+            : mode === 'timer'
+              ? 'start'
+              : 'start-stopwatch',
+          sessionId: createRecordId(),
+        },
         this.sample(),
       );
-    else if (active?.type === 'timer')
+    else if (active)
       this.command(
         {
           type: active.status === 'running' ? 'pause' : 'resume',
@@ -128,6 +161,75 @@ export class FocusTimerService {
         },
         this.sample(),
       );
+  }
+
+  act(type: 'extend' | 'skip-break'): void {
+    if (
+      this.busy() ||
+      this.hasError() ||
+      this.confirmRecoveryAfter !== undefined
+    )
+      return;
+    const active = this.active();
+    void this.command(
+      { type, sessionId: active?.sessionId ?? createRecordId() },
+      this.sample(),
+    );
+  }
+
+  async prepareStop() {
+    const active = this.active();
+    if (
+      !active ||
+      this.onBreak() ||
+      this.busy() ||
+      this.hasError() ||
+      this.confirmRecoveryAfter !== undefined
+    )
+      return;
+    if (active.status === 'paused') return { active, resume: false };
+    const result = await this.command(
+      { type: 'pause', sessionId: active.sessionId },
+      this.sample(),
+    );
+    const paused = this.active();
+    if (
+      result === 'committed' &&
+      paused?.sessionId === active.sessionId &&
+      paused.status === 'paused'
+    )
+      return { active: paused, resume: true };
+    return undefined;
+  }
+
+  stopDecision(expected: ActiveSession, type: 'save' | 'discard' | 'resume') {
+    const state = this.snapshot();
+    if (!state || this.busy() || this.hasError()) return;
+    return this.run(
+      { ...state, active: expected },
+      { type, sessionId: expected.sessionId },
+      this.input(this.sample()),
+    );
+  }
+
+  async configure(
+    patch: BreakSettings | Pick<WorkspaceSettings, 'focusDurationMinutes'>,
+  ): Promise<void> {
+    if (this.busy() || this.hasError()) return;
+    this.writeGeneration++;
+    this.working.set(true);
+    try {
+      const settings = await this.repository.updateFocusSettings((current) => ({
+        ...(current ?? defaultFocusSettings),
+        ...patch,
+      }));
+      const state = this.snapshot();
+      if (state) this.adopt({ ...state, settings });
+      this.channel?.postMessage('changed');
+    } finally {
+      this.working.set(false);
+      this.drainSync();
+    }
   }
 
   async retry(): Promise<void> {
@@ -162,7 +264,7 @@ export class FocusTimerService {
       this.confirmRecoveryAfter = undefined;
       if (
         !committedAt &&
-        active?.type === 'timer' &&
+        active?.plannedDurationMs != null &&
         this.anchor &&
         this.channel &&
         remainingMs(active, this.anchor.elapsedMs) === 0
@@ -174,32 +276,33 @@ export class FocusTimerService {
       }
     }
     this.snapshot.set(state);
-    this.remaining.set(
-      active?.type === 'timer'
-        ? remainingMs(
-            active,
-            this.anchor ? elapsedSinceResume(this.anchor, now.monotonic) : 0,
-          )
-        : state.cycle?.pendingBreak
+    if (active) this.updateDisplay(active, now);
+    else
+      this.remaining.set(
+        state.cycle?.pendingBreak
           ? 0
-          : focusDurationMs,
+          : this.settings().focusDurationMinutes * 60_000,
+      );
+  }
+
+  private updateDisplay(active: ActiveSession, now: ClockSample): void {
+    const elapsed = this.anchor
+      ? elapsedSinceResume(this.anchor, now.monotonic)
+      : 0;
+    this.remaining.set(
+      active.type === 'stopwatch'
+        ? elapsedActiveMs(active, elapsed)
+        : remainingMs(active, elapsed),
     );
   }
 
   private tick(now: ClockSample, checkClock = false): void {
     const active = this.snapshot()?.active;
-    if (
-      active?.type !== 'timer' ||
-      active.status !== 'running' ||
-      !this.anchor ||
-      this.invalid()
-    )
-      return;
-    this.remaining.set(
-      remainingMs(active, elapsedSinceResume(this.anchor, now.monotonic)),
-    );
+    if (active?.status !== 'running' || !this.anchor || this.invalid()) return;
+    this.updateDisplay(active, now);
+    const expired = active.plannedDurationMs !== null && this.remaining() === 0;
     if (!this.busy() && !this.hasError()) {
-      if (this.remaining() === 0) {
+      if (expired) {
         if (
           this.confirmRecoveryAfter === undefined ||
           now.monotonic >= this.confirmRecoveryAfter
@@ -208,11 +311,12 @@ export class FocusTimerService {
       } else if (
         clockDisagrees(this.anchor, now) ||
         (checkClock &&
+          active.plannedDurationMs !== null &&
           remainingMs(active, recoveryAnchor(active, now).elapsedMs) === 0)
       )
         this.command({ type: 'checkpoint', sessionId: active.sessionId }, now);
     }
-    if (this.remaining() > 0 && this.document.visibilityState === 'visible')
+    if (!expired && this.document.visibilityState === 'visible')
       this.observedAt = now.monotonic;
   }
 
@@ -258,17 +362,14 @@ export class FocusTimerService {
     void this.sync();
   }
 
-  private command(command: TimerCommand, now: ClockSample): void {
-    const expected = this.snapshot()?.active;
-    const change = this.deriveChange(expected, command, now);
-    if (change) void this.run(expected, command, change, now);
+  private command(command: TimerCommand, now: ClockSample) {
+    const expected = this.snapshot();
+    return expected
+      ? this.run(expected, command, this.input(now), now)
+      : undefined;
   }
 
-  private deriveChange(
-    expected: ActiveSession | undefined,
-    command: TimerCommand,
-    now: ClockSample,
-  ) {
+  private input(now: ClockSample): TimerInput {
     const elapsedMs = this.anchor
       ? elapsedSinceResume(this.anchor, now.monotonic)
       : 0;
@@ -276,21 +377,21 @@ export class FocusTimerService {
       this.document.visibilityState === 'visible' &&
       this.observedAt !== undefined &&
       now.monotonic - this.observedAt < 2000;
-    return transitionTimer(expected, command, {
+    return {
       wall: now.wall,
       elapsedMs,
       observedCompletion,
       zone: localZone(now.wall),
       revision: createRecordId(),
-    });
+    };
   }
 
   private async run(
-    expected: ActiveSession | undefined,
+    expected: NonNullable<ReturnType<typeof this.snapshot>>,
     command: TimerCommand,
-    change: TimerChange,
-    at: ClockSample,
-  ): Promise<void> {
+    input: TimerInput,
+    at = this.sample(),
+  ): Promise<'committed' | 'conflict' | 'unchanged' | undefined> {
     if (this.busy()) return;
     const action = command.type;
     this.writeGeneration++;
@@ -299,38 +400,45 @@ export class FocusTimerService {
     try {
       const state = await this.repository.updateFocus(
         expected,
-        () => change,
+        (snapshot) =>
+          transitionTimer(snapshot.active, command, input, snapshot),
         action,
       );
       const committed = state.result === 'committed';
       this.adopt(state, committed ? at : undefined);
       this.failure.set(null);
+      this.failedAction.set(null);
       this.conflict.set(
         state.result === 'conflict' &&
           action !== 'recover' &&
           action !== 'checkpoint',
       );
       if (committed) this.channel?.postMessage('changed');
+      return state.result;
     } catch (error) {
       if (error instanceof InvalidActiveSessionError) this.rejectSnapshot();
-      else
+      else {
+        this.failedAction.set(action);
         this.failure.set(() => {
           // User transitions use the retry instant. Completion keeps its
           // original deadline and attribution.
           if (
             action !== 'checkpoint' &&
-            !change.completion &&
-            sameFocusRevision(expected, this.snapshot()?.active)
+            action !== 'recover' &&
+            sameFocusRevision(expected.active, this.snapshot()?.active)
           ) {
             const now = this.sample();
-            const retried = this.deriveChange(expected, command, now);
-            if (retried) return this.run(expected, command, retried, now);
+            return this.run(expected, command, this.input(now), now).then(
+              () => undefined,
+            );
           }
-          return this.run(expected, command, change, at);
+          return this.run(expected, command, input, at).then(() => undefined);
         });
+      }
     } finally {
       this.working.set(false);
       this.drainSync();
     }
+    return undefined;
   }
 }

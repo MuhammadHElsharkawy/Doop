@@ -27,6 +27,7 @@ import {
   InvalidActiveSessionError,
   InvalidRecordError,
   recordValidators,
+  recoverLegacySettings,
 } from './record-validation';
 
 function verify<K extends Store>(
@@ -577,6 +578,23 @@ export function sameFocusRevision(
   );
 }
 
+interface FocusSnapshot {
+  active: ActiveSession | undefined;
+  cycle: PomodoroCycle | undefined;
+  settings: WorkspaceRecords['settings'] | undefined;
+}
+
+function sameCycle(
+  left: PomodoroCycle | undefined,
+  right: PomodoroCycle | undefined,
+): boolean {
+  return (
+    left?.revision === right?.revision &&
+    left?.pendingBreak === right?.pendingBreak &&
+    left?.completedFocusSessions === right?.completedFocusSessions
+  );
+}
+
 export class WorkspaceRepository {
   readonly tasks;
   readonly habits;
@@ -589,17 +607,22 @@ export class WorkspaceRepository {
 
   focusSnapshot() {
     return this.database.run(
-      ['activeSession', 'cycle'],
+      ['activeSession', 'cycle', 'settings'],
       'readonly',
       async (tx) => {
-        const [active, cycle] = await Promise.all([
+        const [active, cycle, settings] = await Promise.all([
           tx.objectStore('activeSession').get('active'),
           tx.objectStore('cycle').get('cycle'),
+          tx.objectStore('settings').get('settings'),
         ]);
         return {
           active:
             active === undefined ? undefined : verify('activeSession', active),
           cycle: cycle === undefined ? undefined : verify('cycle', cycle),
+          settings:
+            settings === undefined
+              ? undefined
+              : recoverLegacySettings(settings),
         };
       },
       'focus:read',
@@ -607,15 +630,18 @@ export class WorkspaceRepository {
   }
 
   updateFocus(
-    expected: ActiveSession | undefined,
-    transition: (
-      active: ActiveSession | undefined,
-    ) =>
-      { active: ActiveSession | null; completion?: FocusSession } | undefined,
+    expected: Pick<FocusSnapshot, 'active' | 'cycle'>,
+    transition: (snapshot: FocusSnapshot) =>
+      | {
+          active: ActiveSession | null;
+          completion?: FocusSession;
+          cycle?: PomodoroCycle;
+        }
+      | undefined,
     action: string,
   ) {
     return this.database.run(
-      ['activeSession', 'sessions', 'cycle'],
+      ['activeSession', 'sessions', 'cycle', 'settings'],
       'readwrite',
       async (tx) => {
         const activeStore = tx.objectStore('activeSession');
@@ -624,41 +650,86 @@ export class WorkspaceRepository {
         const storedCycle = await cycleStore.get('cycle');
         const active =
           stored === undefined ? undefined : verify('activeSession', stored);
-        let cycle =
+        const cycle =
           storedCycle === undefined ? undefined : verify('cycle', storedCycle);
-        if (!sameFocusRevision(expected, active))
-          return { active, cycle, result: 'conflict' as const };
-        const next = transition(active);
-        if (!next) return { active, cycle, result: 'unchanged' as const };
+        const storedSettings = await tx.objectStore('settings').get('settings');
+        const settings =
+          storedSettings === undefined
+            ? undefined
+            : recoverLegacySettings(storedSettings);
+        const snapshot = { active, cycle, settings };
+        if (
+          !sameFocusRevision(expected.active, active) ||
+          !sameCycle(expected.cycle, cycle)
+        )
+          return { ...snapshot, result: 'conflict' as const };
+        const next = transition(snapshot);
+        if (!next) return { ...snapshot, result: 'unchanged' as const };
+        if (
+          storedSettings !== undefined &&
+          !recordValidators.settings(storedSettings) &&
+          settings
+        )
+          await tx.objectStore('settings').put(verify('settings', settings));
 
         if (next.completion) {
           const completion = verify('sessions', next.completion);
-          if (next.active || active?.sessionId !== completion.id)
+          if (
+            active?.sessionId !== completion.id ||
+            next.active?.sessionId === completion.id
+          )
             throw new InvalidRecordError(
               'Focus completion does not match active session',
             );
           const sessions = tx.objectStore('sessions');
-          if ((await sessions.getKey(completion.id)) === undefined) {
-            await sessions.add(completion);
-            const count = (cycle?.completedFocusSessions ?? 0) + 1;
-            cycle = verify('cycle', {
-              id: 'cycle',
-              completedFocusSessions: count,
-              pendingBreak: count >= 4 ? 'long' : 'short',
-            } satisfies PomodoroCycle);
-            await cycleStore.put(cycle);
+          if ((await sessions.getKey(completion.id)) !== undefined) {
+            await activeStore.delete('active');
+            return {
+              ...snapshot,
+              active: undefined,
+              result: 'committed' as const,
+            };
           }
+          await sessions.add(completion);
         }
+        if (next.cycle) await cycleStore.put(verify('cycle', next.cycle));
         if (next.active)
           await activeStore.put(verify('activeSession', next.active));
         else await activeStore.delete('active');
         return {
           active: next.active ?? undefined,
-          cycle,
+          cycle: next.cycle ?? cycle,
+          settings,
           result: 'committed' as const,
         };
       },
       'focus:' + action,
+    );
+  }
+
+  updateFocusSettings(
+    change: (
+      current: WorkspaceRecords['settings'] | undefined,
+    ) => WorkspaceRecords['settings'],
+  ) {
+    return this.database.run(
+      ['settings'],
+      'readwrite',
+      async (tx) => {
+        const store = tx.objectStore('settings');
+        const existing = await store.get('settings');
+        const next = verify(
+          'settings',
+          change(
+            existing === undefined
+              ? undefined
+              : recoverLegacySettings(existing),
+          ),
+        );
+        await store.put(next);
+        return next;
+      },
+      'focus:settings',
     );
   }
 

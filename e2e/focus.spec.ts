@@ -59,10 +59,9 @@ test('finishes after skipped callbacks and recovers at the persisted deadline ex
   await page.getByRole('button', { name: 'Start', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Pause' })).toBeVisible();
   await page.clock.fastForward(26 * 60_000);
-  await expect(
-    page.getByRole('button', { name: 'Start another session' }),
-  ).toBeVisible();
-  await page.getByRole('button', { name: 'Start another session' }).click();
+  await expect(page.getByRole('button', { name: 'Start break' })).toBeVisible();
+  await page.getByRole('button', { name: 'Skip break' }).click();
+  await page.getByRole('button', { name: 'Start', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Pause' })).toBeVisible();
   await page.clock.fastForward(30 * 60_000);
   await expect(page.getByText('Focus session complete')).toBeVisible();

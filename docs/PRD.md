@@ -859,6 +859,8 @@ Rules:
 -   Skipping a short break does not reset the cycle.
 -   The number of focus sessions required before a long break is
     configurable.
+-   Short breaks allow 1–60 minutes, long breaks 1–120 minutes, and
+    the long-break frequency 1–12 completed focus sessions.
 
 The cycle state must persist across refreshes and application restarts.
 

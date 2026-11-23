@@ -190,9 +190,9 @@ test('reopening after midnight and a zone change uses the persisted zone and dea
   });
   await reopened.clock.setFixedTime(new Date('2026-11-24T01:00:00Z'));
   await reopened.goto('/focus');
-  await expect(control(reopened, 'Start another session')).toBeVisible();
+  await expect(control(reopened, 'Start break')).toBeVisible();
   await reopened.reload();
-  await expect(control(reopened, 'Start another session')).toBeVisible();
+  await expect(control(reopened, 'Start break')).toBeVisible();
   expect(await readStore(reopened, 'sessions')).toMatchObject([
     {
       endedAt: '2026-11-24T00:15:00.000Z',
@@ -204,7 +204,7 @@ test('reopening after midnight and a zone change uses the persisted zone and dea
     },
   ]);
   expect(await readStore(reopened, 'activeSession')).toEqual([]);
-  expect(await readStore(reopened, 'cycle')).toEqual([
+  expect(await readStore(reopened, 'cycle')).toMatchObject([
     { id: 'cycle', completedFocusSessions: 1, pendingBreak: 'short' },
   ]);
 });
@@ -264,7 +264,7 @@ test('failed completion rolls back all stores and keyboard retry preserves then 
   await expect(retry).toHaveAttribute('aria-disabled', 'false');
   await expect(retry).toBeFocused();
   await retry.press('Enter');
-  await expect(control(page, 'Start another session')).toBeFocused();
+  await expect(control(page, 'Start break')).toBeFocused();
   expect(await readStore(page, 'activeSession')).toEqual([]);
   expect(await readStore(page, 'sessions')).toMatchObject([
     {
@@ -276,7 +276,7 @@ test('failed completion rolls back all stores and keyboard retry preserves then 
       plannedDurationSeconds: 1500,
     },
   ]);
-  expect(await readStore(page, 'cycle')).toEqual([
+  expect(await readStore(page, 'cycle')).toMatchObject([
     { id: 'cycle', completedFocusSessions: 1, pendingBreak: 'short' },
   ]);
 });

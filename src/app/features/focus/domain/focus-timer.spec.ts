@@ -157,33 +157,63 @@ describe('M5 focus timer', () => {
     const peer = new WorkspaceRepository(second);
     try {
       const running = activeAfter(undefined, 'start', start);
-      await repo.updateFocus(undefined, () => ({ active: running }), 'start');
+      await repo.updateFocus(
+        { active: undefined, cycle: undefined },
+        () => ({ active: running }),
+        'start',
+      );
       const paused = activeAfter(running, 'pause', start + 1000, 1000);
-      await repo.updateFocus(running, () => ({ active: paused }), 'pause');
+      await repo.updateFocus(
+        { active: running, cycle: undefined },
+        () => ({ active: paused }),
+        'pause',
+      );
       const resumed = activeAfter(paused, 'resume', start + 3000);
-      await repo.updateFocus(paused, () => ({ active: resumed }), 'resume');
+      await repo.updateFocus(
+        { active: paused, cycle: undefined },
+        () => ({ active: resumed }),
+        'resume',
+      );
       expect(
-        (await peer.updateFocus(running, () => ({ active: paused }), 'pause'))
-          .result,
+        (
+          await peer.updateFocus(
+            { active: running, cycle: undefined },
+            () => ({ active: paused }),
+            'pause',
+          )
+        ).result,
       ).toBe('conflict');
       expect(
-        (await peer.updateFocus(paused, () => ({ active: resumed }), 'resume'))
-          .result,
+        (
+          await peer.updateFocus(
+            { active: paused, cycle: undefined },
+            () => ({ active: resumed }),
+            'resume',
+          )
+        ).result,
       ).toBe('conflict');
       first.close();
       expect((await repo.focusSnapshot()).active).toEqual(resumed);
       const recover = () =>
         change(resumed, 'recover', start + 9_000_000, focusDurationMs);
       const results = await Promise.all([
-        repo.updateFocus(resumed, recover, 'recover'),
-        peer.updateFocus(resumed, recover, 'recover'),
+        repo.updateFocus(
+          { active: resumed, cycle: undefined },
+          recover,
+          'recover',
+        ),
+        peer.updateFocus(
+          { active: resumed, cycle: undefined },
+          recover,
+          'recover',
+        ),
       ]);
       expect(results.map(({ result }) => result).sort()).toEqual([
         'committed',
         'conflict',
       ]);
       expect(await peer.sessions.list()).toHaveLength(1);
-      expect(await repo.focusSnapshot()).toEqual({
+      expect(await repo.focusSnapshot()).toMatchObject({
         active: undefined,
         cycle: {
           id: 'cycle',
@@ -196,4 +226,54 @@ describe('M5 focus timer', () => {
       second.close();
     }
   });
+});
+
+it('commits automatic breaks with focus history and cycle, or rolls all three back', async () => {
+  const database = new WorkspaceDatabase(createRecordId());
+  const repo = new WorkspaceRepository(database);
+  try {
+    const running = activeAfter(undefined, 'start', start);
+    await repo.updateFocus(
+      { active: undefined, cycle: undefined },
+      () => ({ active: running }),
+      'start',
+    );
+    const expected = await repo.focusSnapshot();
+    const expire = () =>
+      change(
+        running,
+        'recover',
+        start + focusDurationMs,
+        focusDurationMs,
+        true,
+      );
+    const put = IDBObjectStore.prototype.put;
+    IDBObjectStore.prototype.put = function (value, key) {
+      if (this.name === 'activeSession' && value?.type === 'short-break')
+        throw new DOMException('Storage full', 'QuotaExceededError');
+      return put.call(this, value, key);
+    };
+    try {
+      await expect(
+        repo.updateFocus(expected, expire, 'recover'),
+      ).rejects.toMatchObject({ name: 'QuotaExceededError' });
+    } finally {
+      IDBObjectStore.prototype.put = put;
+    }
+    expect(await repo.focusSnapshot()).toEqual(expected);
+    expect(await repo.sessions.list()).toEqual([]);
+    expect((await repo.updateFocus(expected, expire, 'recover')).result).toBe(
+      'committed',
+    );
+    expect((await repo.updateFocus(expected, expire, 'recover')).result).toBe(
+      'conflict',
+    );
+    expect(await repo.focusSnapshot()).toMatchObject({
+      active: { type: 'short-break', plannedDurationMs: 300_000 },
+      cycle: { completedFocusSessions: 1, pendingBreak: null },
+    });
+    expect(await repo.sessions.list()).toHaveLength(1);
+  } finally {
+    database.close();
+  }
 });

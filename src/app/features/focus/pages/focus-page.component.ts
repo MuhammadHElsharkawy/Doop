@@ -7,115 +7,90 @@ import {
   ElementRef,
   inject,
   Injector,
+  signal,
   viewChild,
 } from '@angular/core';
 import { Title } from '@angular/platform-browser';
 import { LocalizationService } from '../../../core/localization/localization.service';
+import { DialogComponent } from '../../../shared/ui/dialog.component';
 import { FocusTimerService } from '../application/focus-timer.service';
+import { validBreakSetting, validFocusMinutes } from '../domain/focus-settings';
+import { focusMessages } from './focus-messages';
 
-const messages = {
-  en: {
-    mode: 'Pomodoro Timer',
-    start: 'Start',
-    pause: 'Pause',
-    resume: 'Resume',
-    again: 'Start another session',
-    running: 'Focus session running',
-    paused: 'Focus session paused',
-    completed: 'Focus session complete',
-    idle: 'Ready to focus',
-    loading: 'Loading timer…',
-    unavailable: 'Another focus mode is already active.',
-    retry: 'Retry timer action',
-    error: 'The timer change could not be saved. Retry to continue.',
-    invalid:
-      'The saved timer contains inconsistent timing data and cannot be recovered. Its data has been preserved.',
-    conflict:
-      'The timer changed in another tab. Review its current state and try again.',
-  },
-  ar: {
-    mode: 'مؤقت بومودورو',
-    start: 'ابدأ',
-    pause: 'إيقاف مؤقت',
-    resume: 'استئناف',
-    again: 'ابدأ جلسة أخرى',
-    running: 'جلسة التركيز جارية',
-    paused: 'جلسة التركيز متوقفة مؤقتًا',
-    completed: 'اكتملت جلسة التركيز',
-    idle: 'جاهز للتركيز',
-    loading: 'جارٍ تحميل المؤقت…',
-    unavailable: 'يوجد وضع تركيز آخر نشط بالفعل.',
-    retry: 'إعادة محاولة إجراء المؤقت',
-    error: 'تعذّر حفظ التغيير في المؤقت. أعد المحاولة للمتابعة.',
-    invalid:
-      'تتضمن بيانات المؤقت المحفوظة أوقاتًا غير متسقة، لذا تعذّرت استعادته. تم الاحتفاظ بالبيانات.',
-    conflict:
-      'تغيّر المؤقت في علامة تبويب أخرى. راجع حالته الحالية وحاول مجددًا.',
-  },
-} as const;
+type Panel = 'duration' | 'settings' | 'stop';
+type FormError = 'duration' | 'short' | 'long' | 'frequency' | 'write';
 
 @Component({
   selector: 'app-focus-page',
+  imports: [DialogComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
-  template: `
-    <h1 class="page-title">{{ locale.text().focus }}</h1>
-    <section
-      class="task-list mt-8 max-w-lg px-5 py-7 text-center"
-      aria-labelledby="focus-mode"
-    >
-      <h2 id="focus-mode" class="text-lg font-semibold">{{ text().mode }}</h2>
-      @if (timer.phase() === 'invalid') {
-        <p class="mt-4 task-error" role="alert">{{ text().invalid }}</p>
-      } @else if (timer.phase() === 'loading') {
-        @if (!timer.hasError()) {
-          <p class="mt-4" role="status">{{ text().loading }}</p>
-        }
-      } @else if (timer.phase() === 'unavailable') {
-        <p class="mt-4">{{ text().unavailable }}</p>
-      } @else {
-        <p
-          class="my-4 text-5xl font-semibold tabular-nums sm:text-6xl"
-          role="timer"
-          dir="ltr"
-        >
-          {{ display() }}
-        </p>
-        <p class="mb-4 text-muted" role="status">{{ text()[timer.phase()] }}</p>
-        <button
-          #primary
-          class="task-button task-primary"
-          type="button"
-          [attr.aria-disabled]="timer.busy() || timer.hasError()"
-          (click)="timer.activate()"
-        >
-          {{ action() }}
-        </button>
-        @if (timer.changedElsewhere()) {
-          <p class="mt-4 text-muted" role="status">{{ text().conflict }}</p>
-        }
-        @if (timer.hasError()) {
-          <p class="mt-4 task-error">{{ text().error }}</p>
-          <button
-            class="task-button mt-3"
-            type="button"
-            [attr.aria-disabled]="timer.busy()"
-            (click)="retry($event)"
-          >
-            {{ text().retry }}
-          </button>
-        }
-      }
-    </section>
+  styles: `
+    button[aria-pressed='true'] {
+      border-color: var(--accent);
+      color: var(--accent);
+      background: var(--accent-wash);
+    }
+    button[aria-disabled='true'] {
+      opacity: 0.55;
+      cursor: default;
+    }
   `,
+  templateUrl: './focus-page.component.html',
 })
 export class FocusPageComponent {
   protected readonly timer = inject(FocusTimerService);
   protected readonly locale = inject(LocalizationService);
-  private readonly title = inject(Title);
-  private readonly injector = inject(Injector);
+  protected readonly mode = signal<'timer' | 'stopwatch'>('timer');
+  protected readonly panel = signal<Panel | null>(null);
+  protected readonly formError = signal<FormError | null>(null);
+  protected readonly presetError = signal(false);
+  protected readonly presets = [25, 45, 60];
+  protected readonly dialog = viewChild.required<DialogComponent>('dialog');
+  protected readonly stopContext =
+    signal<Awaited<ReturnType<FocusTimerService['prepareStop']>>>(undefined);
+  private readonly continueButton =
+    viewChild<ElementRef<HTMLButtonElement>>('continueButton');
   private readonly primary =
     viewChild<ElementRef<HTMLButtonElement>>('primary');
-  protected readonly text = computed(() => messages[this.locale.language()]);
+  private readonly title = inject(Title);
+  private readonly injector = inject(Injector);
+  protected readonly text = computed(
+    () => focusMessages[this.locale.language()],
+  );
+  protected readonly blocked = computed(
+    () => this.timer.busy() || this.timer.hasError(),
+  );
+  protected readonly customHours = computed(() =>
+    Math.floor(this.timer.settings().focusDurationMinutes / 60),
+  );
+  protected readonly customMinutes = computed(
+    () => this.timer.settings().focusDurationMinutes % 60,
+  );
+  protected readonly canSave = computed(() => {
+    const active = this.stopContext()?.active;
+    return (
+      active?.type === 'timer' ||
+      (active?.type === 'stopwatch' && active.accumulatedActiveMs >= 1000)
+    );
+  });
+  protected readonly dialogHeading = computed(() => {
+    if (this.panel() === 'duration') return this.text().custom;
+    if (this.panel() === 'settings') return this.text().settings;
+    return this.stopContext()?.active.type === 'stopwatch'
+      ? this.text().stopWatchTitle
+      : this.text().stopTitle;
+  });
+  protected readonly heading = computed(() => {
+    const type = this.timer.active()?.type;
+    const pending = this.timer.pendingBreak();
+    if (type === 'long-break' || pending === 'long')
+      return this.text().longBreak;
+    if (type === 'short-break' || pending === 'short')
+      return this.text().shortBreak;
+    return (type ?? this.mode()) === 'stopwatch'
+      ? this.text().stopwatch
+      : this.text().mode;
+  });
   private readonly digits = computed(
     () =>
       new Intl.NumberFormat(this.locale.language(), {
@@ -123,24 +98,148 @@ export class FocusPageComponent {
         useGrouping: false,
       }),
   );
+  private readonly minutes = computed(
+    () =>
+      new Intl.NumberFormat(this.locale.language(), {
+        style: 'unit',
+        unit: 'minute',
+        unitDisplay: 'short',
+      }),
+  );
   protected readonly display = computed(() => {
-    const seconds = this.timer.seconds();
-    return (
-      this.digits().format(Math.floor(seconds / 60)) +
-      ':' +
-      this.digits().format(seconds % 60)
-    );
+    const seconds =
+      this.timer.phase() === 'idle' && this.mode() === 'stopwatch'
+        ? 0
+        : this.timer.seconds();
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor(seconds / 60) % 60;
+    return (hours ? [hours, minutes, seconds % 60] : [minutes, seconds % 60])
+      .map((value) => this.digits().format(value))
+      .join(':');
   });
   protected readonly action = computed(() => {
     const phase = this.timer.phase();
     if (phase === 'running') return this.text().pause;
     if (phase === 'paused') return this.text().resume;
-    if (phase === 'completed') return this.text().again;
+    if (phase === 'completed') return this.text().startBreak;
     return this.text().start;
   });
 
   constructor() {
     effect(() => this.title.setTitle(this.locale.text().focus + ' · Doop'));
+  }
+
+  protected minuteLabel(minutes: number): string {
+    return this.minutes().format(minutes);
+  }
+
+  protected async preset(minutes: number): Promise<void> {
+    if (this.blocked()) return;
+    this.presetError.set(false);
+    try {
+      await this.timer.configure({ focusDurationMinutes: minutes });
+    } catch {
+      this.presetError.set(true);
+    }
+  }
+
+  protected open(panel: Panel, trigger: HTMLElement): void {
+    if (this.blocked()) return;
+    this.formError.set(null);
+    this.presetError.set(false);
+    this.panel.set(panel);
+    this.dialog().open(trigger);
+    afterNextRender(() => this.continueButton()?.nativeElement.focus(), {
+      injector: this.injector,
+    });
+  }
+
+  protected async openStop(trigger: HTMLElement): Promise<void> {
+    const context = await this.timer.prepareStop();
+    if (context) {
+      if (context.active.type === 'stopwatch') this.mode.set('stopwatch');
+      this.stopContext.set(context);
+      this.open('stop', trigger);
+    }
+  }
+
+  protected closed(): void {
+    const context = this.stopContext();
+    this.stopContext.set(undefined);
+    this.panel.set(null);
+    if (context?.resume) void this.timer.stopDecision(context.active, 'resume');
+  }
+
+  protected async decide(action: 'save' | 'discard'): Promise<void> {
+    const context = this.stopContext();
+    if (!context || this.blocked() || (action === 'save' && !this.canSave()))
+      return;
+    const result = await this.timer.stopDecision(context.active, action);
+    if (result === 'committed' || result === 'conflict') this.finishStop();
+  }
+
+  protected async retryStop(): Promise<void> {
+    await this.timer.retry();
+    if (!this.timer.hasError()) this.finishStop();
+  }
+
+  private finishStop(): void {
+    this.stopContext.set(undefined);
+    this.dialog().close();
+  }
+
+  protected async saveSettings(
+    event: SubmitEvent,
+    form: HTMLFormElement,
+  ): Promise<void> {
+    event.preventDefault();
+    if (this.blocked()) return;
+    this.formError.set(null);
+    const value = (name: string) => {
+      const field = form.elements.namedItem(name);
+      return field instanceof HTMLInputElement ? field.valueAsNumber : NaN;
+    };
+    try {
+      if (this.panel() === 'duration') {
+        const hours = value('hours');
+        const minutes = value('minutes');
+        const duration = hours * 60 + minutes;
+        if (
+          !Number.isInteger(hours) ||
+          hours < 0 ||
+          minutes < 0 ||
+          minutes > 55 ||
+          minutes % 5 !== 0 ||
+          !validFocusMinutes(duration)
+        ) {
+          this.formError.set('duration');
+          form.querySelector<HTMLInputElement>('input')?.focus();
+          return;
+        }
+        await this.timer.configure({ focusDurationMinutes: duration });
+      } else {
+        for (const field of ['short', 'long', 'frequency'] as const) {
+          const max = field === 'short' ? 60 : field === 'long' ? 120 : 12;
+          if (!validBreakSetting(value(field), max)) {
+            this.formError.set(field);
+            form
+              .querySelector<HTMLInputElement>('[name="' + field + '"]')
+              ?.focus();
+            return;
+          }
+        }
+        const transition = new FormData(form).get('transition');
+        await this.timer.configure({
+          shortBreakDurationMinutes: value('short'),
+          longBreakDurationMinutes: value('long'),
+          focusSessionsBeforeLongBreak: value('frequency'),
+          breakTransition: transition === 'manual' ? 'manual' : 'automatic',
+        });
+      }
+      this.dialog().close();
+    } catch {
+      this.formError.set('write');
+    }
   }
 
   protected async retry(event: MouseEvent): Promise<void> {

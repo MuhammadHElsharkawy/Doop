@@ -15,6 +15,7 @@ import { createRecordId } from '../domain/record-id';
 import type { FocusSession, Task } from '../domain/workspace-records';
 import { decodeBackup, encodeBackup } from './backup';
 import { WorkspaceRepository } from './workspace.repository';
+import { defaultFocusSettings } from '../../features/focus/domain/focus-settings';
 
 const date = new Date(2024, 1, 29, 12);
 const day = toLocalDate(date);
@@ -69,6 +70,55 @@ describe('workspace repositories', () => {
   });
 
   afterEach(() => db.close());
+
+  it('rejects invalid settings in backups and repairs legacy stored break limits on the next successful focus write', async () => {
+    const snapshot = await repositories.snapshot(preferences, now);
+    const bad = {
+      ...defaultFocusSettings,
+      shortBreakDurationMinutes: Number.MAX_SAFE_INTEGER,
+      longBreakDurationMinutes: 120,
+      focusSessionsBeforeLongBreak: 12,
+      dailyGoal: 9,
+    };
+    expect(
+      decodeBackup(
+        JSON.stringify({
+          ...snapshot,
+          settings: { ...snapshot.settings, workspace: bad },
+        }),
+      ),
+    ).toMatchObject({ ok: false, reason: 'invalid-data' });
+    await expect(repositories.settings.save(bad)).rejects.toThrow();
+    const raw = await openDB(name);
+    await raw.put('settings', bad);
+    raw.close();
+    const state = await repositories.focusSnapshot();
+    expect(state.settings).toMatchObject({
+      shortBreakDurationMinutes: 5,
+      longBreakDurationMinutes: 120,
+      focusSessionsBeforeLongBreak: 12,
+      dailyGoal: 9,
+    });
+    await repositories.updateFocus(
+      state,
+      () => ({
+        active: {
+          id: 'active',
+          sessionId: 'repair',
+          type: 'timer',
+          status: 'running',
+          startedAt: now,
+          resumedAt: now,
+          accumulatedActiveMs: 0,
+          plannedDurationMs: 1500000,
+          taskId: null,
+          taskTitleSnapshot: null,
+        },
+      }),
+      'start',
+    );
+    expect(await repositories.settings.get('settings')).toEqual(state.settings);
+  });
 
   it('creates and edits tasks, persists across reopen, and preserves session history after soft deletion', async () => {
     expect(await repositories.tasks.list()).toEqual([]);

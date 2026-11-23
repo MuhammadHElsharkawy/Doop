@@ -87,6 +87,7 @@ export interface PomodoroCycle {
   id: 'cycle';
   completedFocusSessions: number;
   pendingBreak: 'short' | 'long' | null;
+  revision?: string;
 }
 
 export interface WorkspaceSettings {

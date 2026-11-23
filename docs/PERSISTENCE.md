@@ -38,6 +38,10 @@ The write transaction compares the expected snapshot revision before applying a 
 
 Observed completion uses the device zone during observation. Unobserved completion uses the running segment's persisted zone and the offset in effect at its UTC deadline. If only an offset was captured, it remains fixed. Legacy snapshots without either zone or offset use UTC for unobserved completion.
 
+M6 extends the existing timing metadata to breaks and Stopwatch. The cycle can carry an optional revision, and existing unversioned cycle rows are still readable. Focus settings use the existing workspace settings row. Timer mutations read those settings and check both active and cycle revisions in the transaction. Focus completion, cycle advancement, and any automatic break snapshot commit together. Partial focus and completed Stopwatch history preserve the effective target and measured elapsed time respectively. A stopped session uses its saved pause instant for the history end time. Active sessions and cycle data remain outside backups. Database and backup versions stay at 3 and 2.
+
+Short breaks are limited to 1–60 minutes, long breaks to 1–120 minutes, and the long-break frequency to 1–12 sessions. Backup decoding rejects out-of-range settings. Existing settings rows written under earlier rules are read with the affected out-of-range values replaced by their defaults. Other preferences are preserved. The repaired row is committed alongside the next successful Focus transition or settings save.
+
 ## JSON backup
 
 The version 2 contract uses the `doop-backup` format identifier and includes an export timestamp, durable productivity collections, workspace settings, and appearance preferences. It carries the habit deletion-date field. The decoder upgrades valid version 1 payloads in memory using the same unknown-date policy. Active session and cycle state stay outside the backup. A readonly transaction captures the IndexedDB portion as one snapshot.

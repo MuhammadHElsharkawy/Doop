@@ -51,3 +51,5 @@ Task management uses a ruled summary above one continuous list. Each row uses th
 Habits uses the same ruled rows, controls, and modal. The weekday controls read like a planner strip with native radio buttons and checkboxes, full weekday names for assistive technology, and a wrapping layout. Today's Habits uses the same row on both destinations. Only the Overview list owns a bounded scroll area. No new visual tokens are needed.
 
 The Habits page uses an underlined tab strip and a ruled daily checklist. In the management list, names expand to reveal history, completion rates align at the trailing edge, and secondary actions share one compact menu.
+
+Focus keeps the existing timer panel and tabular digits. Mode, preset, and timer controls use the established buttons and accent tokens. Duration, break settings, and Stop use the shared dialog, field, and focus patterns.
