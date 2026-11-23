@@ -4,7 +4,9 @@ Doop is a local-first productivity workspace. M0 delivers the repository baselin
 
 ## Setup
 
-Use Node.js **22.22.3** (recorded in `.nvmrc`) and npm **12.2.0**. Install dependencies from the npm lockfile and download the Chromium headless shell.
+Use Node.js **22.22.3** (recorded in `.nvmrc`) and npm **12.2.0** to match CI. If your Node installation ships with an older npm, run `npm install --global npm@12.2.0` first. Doop enforces the Node and npm ranges declared in `package.json` and uses npm 12's default policy of blocking unapproved dependency install scripts.
+
+Install dependencies from the npm lockfile and download the Chromium headless shell.
 
 ```sh
 npm ci
@@ -27,6 +29,8 @@ Open <http://localhost:4200>. On Linux, install required browser system packages
 | `npm test`             | Run the Vitest unit suite once through Angular CLI.                   |
 | `npm run test:watch`   | Watch and rerun unit tests.                                           |
 | `npm run e2e`          | Smoke-test a production-configured server on port 4201 in Chromium.   |
+
+`tsconfig.json` groups the application, unit test, and Playwright projects for editors. `npm run typecheck` checks each project, including Angular templates. Node types are scoped to the Playwright project.
 
 ## Toolchain
 
