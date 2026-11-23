@@ -1,6 +1,6 @@
 # Doop
 
-Doop is a local-first productivity workspace. M1 provides the responsive navigation shell and settings for language, appearance, and color theme. Destination pages are marked as upcoming.
+Doop is a local-first productivity workspace. The responsive shell includes language, appearance, and theme settings. M2 adds the IndexedDB persistence foundation. Destination pages are marked as upcoming.
 
 ## Setup
 
@@ -39,3 +39,5 @@ Angular, CLI, and build **22.3.0**, TypeScript **6.0.3**, Tailwind CSS and its P
 Angular Router serves the five lazy destinations. Configure static hosting to fall back to `index.html` for direct links. The app uses a typed runtime message catalog for English and Arabic, and stores appearance, theme, and language in browser-local preferences.
 
 See [AGENTS.md](AGENTS.md), the [PRD](docs/PRD.md), the [design context](docs/DESIGN.md), the [interaction contract](docs/UX-CONTRACT.md), and the [implementation roadmap](docs/03-IMPLEMENTATION-ROADMAP.md).
+
+See [Persistence and backup contracts](docs/PERSISTENCE.md) for the schema, storage behavior, and backup foundation.

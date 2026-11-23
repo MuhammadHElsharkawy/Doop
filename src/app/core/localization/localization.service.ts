@@ -31,6 +31,24 @@ const en = {
   teal: 'Teal',
   rose: 'Rose',
   amber: 'Amber',
+  workspaceLoading: 'Opening local workspace storage…',
+  workspaceBlocked:
+    'Close other Doop tabs to finish opening workspace storage.',
+  workspaceStorageError:
+    'Doop couldn’t open workspace storage. Check that your browser allows site storage.',
+  workspaceMigrationError:
+    'Some stored records prevent the workspace upgrade. Your previous data is still intact.',
+  workspaceInvalidRecord:
+    'Doop couldn’t read a stored workspace record. The record is still in storage.',
+  workspaceInvalidRecordWrite:
+    'Doop couldn’t save your change because a stored record is unreadable. The record is still in storage.',
+  workspaceReadError:
+    'Doop couldn’t read workspace data. Try reading it again.',
+  workspaceWriteError:
+    'Doop couldn’t save your change. Try the same action again.',
+  workspaceQuotaError:
+    'Your change wasn’t saved because browser storage is full. Free space and try the same action again.',
+  retryStorage: 'Retry storage',
   storageError:
     'Doop couldn’t save or load preferences. Changes may be lost when you refresh.',
 };
@@ -65,6 +83,23 @@ const ar: typeof en = {
   teal: 'أخضر مزرق',
   rose: 'وردي',
   amber: 'كهرماني',
+  workspaceLoading: 'جارٍ فتح مساحة التخزين المحلية…',
+  workspaceBlocked: 'أغلق علامات تبويب Doop الأخرى لإكمال فتح مساحة التخزين.',
+  workspaceStorageError:
+    'تعذّر على Doop فتح بيانات مساحة العمل. تأكّد من أن متصفحك يسمح للموقع بتخزين البيانات.',
+  workspaceMigrationError:
+    'تمنع بعض السجلات ترقية مساحة العمل. ما زالت بياناتك السابقة محفوظة.',
+  workspaceInvalidRecord:
+    'تعذّر على Doop قراءة أحد سجلات مساحة العمل. ما زال السجل محفوظًا.',
+  workspaceInvalidRecordWrite:
+    'تعذّر على Doop حفظ التغيير لأن أحد السجلات المحفوظة غير قابل للقراءة. ما زال السجل محفوظًا.',
+  workspaceReadError:
+    'تعذّر على Doop قراءة بيانات مساحة العمل. حاول قراءتها مرة أخرى.',
+  workspaceWriteError:
+    'تعذّر على Doop حفظ التغيير. حاول تنفيذ الإجراء نفسه مرة أخرى.',
+  workspaceQuotaError:
+    'لم يُحفَظ التغيير لأن مساحة تخزين المتصفح ممتلئة. حرّر بعض المساحة ثم أعد تنفيذ الإجراء نفسه.',
+  retryStorage: 'إعادة محاولة فتح التخزين',
   storageError:
     'تعذّر حفظ التفضيلات أو تحميلها. قد تفقد التغييرات عند تحديث الصفحة.',
 };

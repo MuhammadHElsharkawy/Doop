@@ -1,6 +1,7 @@
 ﻿import {
   ChangeDetectionStrategy,
   Component,
+  computed,
   ElementRef,
   inject,
   signal,
@@ -9,6 +10,7 @@
 import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { destinations } from './app.routes';
 import { LocalizationService } from './core/localization/localization.service';
+import { PersistenceService } from './core/persistence/persistence.service';
 import { PreferencesService } from './core/preferences/preferences.service';
 import { SettingsComponent } from './features/settings/settings.component';
 import { DialogComponent } from './shared/ui/dialog.component';
@@ -31,8 +33,30 @@ import { IconComponent } from './shared/ui/icon.component';
 export class AppComponent {
   protected readonly text = inject(LocalizationService).text;
   protected readonly preferences = inject(PreferencesService);
+  protected readonly persistence = inject(PersistenceService);
   protected readonly destinations = destinations;
   protected readonly compact = signal(false);
+  protected readonly storageNotice = computed(() => {
+    const text = this.text();
+    switch (this.persistence.status()) {
+      case 'connection-error':
+        return { message: text.workspaceStorageError, retry: true };
+      case 'migration-error':
+        return { message: text.workspaceMigrationError, retry: true };
+      case 'invalid-record':
+        return { message: text.workspaceInvalidRecord, retry: true };
+      case 'invalid-record-write':
+        return { message: text.workspaceInvalidRecordWrite, retry: false };
+      case 'read-error':
+        return { message: text.workspaceReadError, retry: true };
+      case 'write-error':
+        return { message: text.workspaceWriteError, retry: false };
+      case 'quota-error':
+        return { message: text.workspaceQuotaError, retry: false };
+      default:
+        return null;
+    }
+  });
   private readonly main = viewChild<ElementRef<HTMLElement>>('main');
   private activated = false;
 
@@ -49,5 +73,10 @@ export class AppComponent {
     if (this.activated)
       this.main()?.nativeElement.focus({ preventScroll: true });
     this.activated = true;
+  }
+
+  protected retryStorage(): void {
+    this.main()?.nativeElement.focus();
+    this.persistence.retry();
   }
 }

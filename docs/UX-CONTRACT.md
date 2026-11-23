@@ -13,3 +13,5 @@ The [PRD](PRD.md) and [milestone roadmap](03-IMPLEMENTATION-ROADMAP.md) define p
 | Preferences     | Preferences and localization services | Settings apply immediately and persist locally. Language updates copy, document direction and route titles. Appearance and palette are independent. A failed write keeps preferences usable in-session and displays a warning. | Unit and browser preference tests |
 
 The five destination routes share a clearly labeled placeholder. Their feature-specific interactions will be defined when those milestones begin.
+
+The shell owns workspace storage feedback. Opening uses a status announcement. A blocked upgrade explains how to release it. A connection or read failure shows a localized alert with a retry button. Retry returns keyboard focus to the main landmark and repeats the failed open or read. Write failures explain how to repeat the original action and stay visible until that action succeeds. The shell remains navigable during a failure.

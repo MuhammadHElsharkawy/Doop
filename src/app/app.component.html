@@ -47,6 +47,28 @@
   </header>
 
   <main #main id="main-content" tabindex="-1">
+    @switch (persistence.status()) {
+      @case ('loading') {
+        <p class="notice mb-5" role="status">{{ text().workspaceLoading }}</p>
+      }
+      @case ('blocked') {
+        <p class="notice mb-5" role="alert">{{ text().workspaceBlocked }}</p>
+      }
+    }
+    @if (storageNotice(); as notice) {
+      <div class="notice mb-5 grid gap-2">
+        <p role="alert">{{ notice.message }}</p>
+        @if (notice.retry) {
+          <button
+            type="button"
+            class="settings-button justify-self-start"
+            (click)="retryStorage()"
+          >
+            {{ text().retryStorage }}
+          </button>
+        }
+      </div>
+    }
     @if (preferences.storageUnavailable()) {
       <p class="notice mb-5" role="alert">{{ text().storageError }}</p>
     }
