@@ -31,9 +31,7 @@ export class FocusHistoryComponent {
   protected readonly history = inject(FocusHistoryService);
   protected readonly text = computed(() => focusExtras[this.locale.language()]);
   protected readonly goal = computed(() => this.timer.settings().dailyGoal);
-  protected readonly goalReady = computed(
-    () => this.timer.phase() !== 'loading' && this.timer.phase() !== 'invalid',
-  );
+  protected readonly goalReady = this.timer.ready;
   protected readonly counts = this.history.today;
   protected readonly date = signal<LocalDate | null>(null);
   protected readonly rows = computed(() =>

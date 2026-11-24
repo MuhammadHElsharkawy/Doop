@@ -421,7 +421,7 @@ describe('workspace repositories', () => {
     await legacy.add('tasks', task);
     await legacy.add('completions', completion);
     legacy.close();
-    expect((await db.open()).version).toBe(4);
+    expect((await db.open()).version).toBe(5);
     expect(await repositories.tasks.get(task.id)).toEqual(task);
     expect(
       await repositories.completions.getOccurrence(completion.habitId, day),

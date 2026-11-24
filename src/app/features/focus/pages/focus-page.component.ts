@@ -256,7 +256,16 @@ export class FocusPageComponent {
   protected async retry(event: MouseEvent): Promise<void> {
     const trigger = event.currentTarget;
     await this.timer.retry();
-    if (this.timer.hasError()) return;
+    if (!this.timer.hasError()) this.restoreRetryFocus(trigger);
+  }
+
+  protected async retryLoad(event: MouseEvent): Promise<void> {
+    const trigger = event.currentTarget;
+    await this.timer.retryLoad();
+    if (this.timer.ready()) this.restoreRetryFocus(trigger);
+  }
+
+  private restoreRetryFocus(trigger: EventTarget | null): void {
     afterNextRender(
       () => {
         const primary = this.primary()?.nativeElement;

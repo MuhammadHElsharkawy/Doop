@@ -108,7 +108,7 @@ export class FocusHistoryService {
     void this.refreshGoal();
   }
 
-  private async refreshGoal(): Promise<void> {
+  async refreshGoal(): Promise<void> {
     const request = ++this.goalRequest;
     try {
       const settings = await this.persistence.repositories.readFocusSettings();

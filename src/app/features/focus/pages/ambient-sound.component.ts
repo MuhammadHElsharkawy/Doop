@@ -34,13 +34,11 @@ export class AmbientSoundComponent {
   protected readonly sounds = ambientSounds;
   protected readonly text = computed(() => focusExtras[this.locale.language()]);
   protected readonly names = computed(() => soundNames[this.locale.language()]);
-  protected readonly ready = computed(
-    () => this.timer.phase() !== 'loading' && this.timer.phase() !== 'invalid',
-  );
+  protected readonly ready = this.timer.ready;
   protected readonly timerLoadingLabel = computed(() =>
-    this.timer.phase() === 'invalid'
-      ? this.text().settingsUnavailable
-      : this.text().loadingSettings,
+    this.timer.phase() === 'loading'
+      ? this.text().loadingSettings
+      : this.text().settingsUnavailable,
   );
   protected readonly playing = signal(false);
   protected readonly playError = signal(false);

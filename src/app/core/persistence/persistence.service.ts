@@ -24,6 +24,8 @@ export class PersistenceService {
   private metadata?: WorkspaceMetadata;
 
   readonly status = this.state.asReadonly();
+  private readonly retried = signal(0);
+  readonly retryRevision = this.retried.asReadonly();
   private readonly replacement = signal(0);
   readonly replacementRevision = this.replacement.asReadonly();
   private readonly channel =
@@ -101,12 +103,19 @@ export class PersistenceService {
       this.preferences.adopt(value ?? defaultPreferences, replaced);
   }
 
+  async retryRead<T>(read: () => Promise<T>): Promise<T> {
+    await this.database.retryConnection();
+    return read();
+  }
+
   async retry(): Promise<void> {
     try {
       await this.database.retry();
       await this.refreshMetadata();
     } catch {
       // The underlying storage operation reports its own error.
+    } finally {
+      this.retried.update((revision) => revision + 1);
     }
   }
 }

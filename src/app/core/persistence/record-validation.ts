@@ -261,6 +261,22 @@ export function recoverLegacySettings(
   };
 }
 
+type Metadata = WorkspaceRecords['metadata'];
+const metadataFields = {
+  id: choice('workspace' as const),
+  generation: nonnegativeInt,
+  preferences: nullable(isPreferences),
+};
+const metadataWithoutRevision =
+  object<Omit<Metadata, 'revision'>>(metadataFields);
+
+export function restoreMissingMetadataRevision(
+  value: unknown,
+): Metadata | undefined {
+  if (!metadataWithoutRevision(value)) return undefined;
+  return { ...value, revision: 0 };
+}
+
 export const recordValidators: {
   [K in keyof WorkspaceRecords]: Guard<WorkspaceRecords[K]>;
 } = {
@@ -350,11 +366,9 @@ export const recordValidators: {
   ),
   activeSession: validActiveSession,
   cycle: (value): value is Cycle => legacyCycle(value) || versionedCycle(value),
-  metadata: object<WorkspaceRecords['metadata']>({
-    id: choice('workspace'),
-    generation: nonnegativeInt,
+  metadata: object<Metadata>({
+    ...metadataFields,
     revision: nonnegativeInt,
-    preferences: nullable(isPreferences),
   }),
   settings: object<WorkspaceRecords['settings']>({
     id: choice('settings'),

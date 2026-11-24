@@ -15,7 +15,10 @@ import type {
 import { createRecordId } from '../../../core/domain/record-id';
 import { FocusHistoryService } from '../../../core/persistence/focus-history.service';
 import { PersistenceService } from '../../../core/persistence/persistence.service';
-import { InvalidActiveSessionError } from '../../../core/persistence/record-validation';
+import {
+  InvalidActiveSessionError,
+  InvalidRecordError,
+} from '../../../core/persistence/record-validation';
 import {
   sameFocusRevision,
   UnavailableFocusTaskError,
@@ -48,7 +51,9 @@ export class FocusTimerService {
   private readonly remaining = signal(focusDurationMs);
   private readonly working = signal(false);
   private readonly failure = signal<(() => Promise<void>) | null>(null);
-  private readonly invalid = signal(false);
+  private readonly loadError = signal<
+    'invalid' | 'invalid-record' | 'unavailable' | null
+  >(null);
   private readonly conflict = signal(false);
   private readonly replacementConflict = signal(false);
   private readonly unavailableTask = signal(false);
@@ -56,8 +61,7 @@ export class FocusTimerService {
   private anchor?: RunningAnchor;
   private observedAt?: number;
   private confirmRecoveryAfter?: number;
-  private loadFailed = false;
-  private reading = false;
+  private reading?: Promise<void>;
   private writeGeneration = 0;
   private syncQueued = false;
   private lastRead = -Infinity;
@@ -67,6 +71,9 @@ export class FocusTimerService {
       : new BroadcastChannel('doop-focus-commits');
 
   readonly busy = this.working.asReadonly();
+  readonly ready = computed(
+    () => this.snapshot() !== null && this.loadError() === null,
+  );
   readonly hasError = computed(() => this.failure() !== null);
   readonly resumeFailed = computed(
     () => this.hasError() && this.failedAction() === 'resume',
@@ -86,7 +93,8 @@ export class FocusTimerService {
     return type === 'short-break' || type === 'long-break';
   });
   readonly phase = computed(() => {
-    if (this.invalid()) return 'invalid';
+    const loadError = this.loadError();
+    if (loadError) return loadError;
     const state = this.snapshot();
     if (!state) return 'loading';
     return (
@@ -139,9 +147,15 @@ export class FocusTimerService {
       this.document.defaultView?.removeEventListener('focus', visible);
     });
     effect(() => {
-      if (this.persistence.status() === 'ready' && this.loadFailed)
+      if (this.persistence.status() === 'ready')
         untracked(() => {
-          void this.sync();
+          if (this.loadError() === 'unavailable') void this.sync();
+        });
+    });
+    effect(() => {
+      if (this.persistence.retryRevision())
+        untracked(() => {
+          void this.retryLoad();
         });
     });
     void this.sync();
@@ -151,7 +165,7 @@ export class FocusTimerService {
     if (
       this.busy() ||
       this.hasError() ||
-      this.invalid() ||
+      !this.ready() ||
       this.confirmRecoveryAfter !== undefined
     )
       return;
@@ -197,6 +211,7 @@ export class FocusTimerService {
     const active = this.active();
     if (
       !active ||
+      !this.ready() ||
       this.onBreak() ||
       this.busy() ||
       this.hasError() ||
@@ -220,7 +235,7 @@ export class FocusTimerService {
 
   stopDecision(expected: ActiveSession, type: 'save' | 'discard' | 'resume') {
     const state = this.snapshot();
-    if (!state || this.busy() || this.hasError()) return;
+    if (!state || !this.ready() || this.busy() || this.hasError()) return;
     return this.run(
       { ...state, active: expected },
       { type, sessionId: expected.sessionId },
@@ -232,7 +247,7 @@ export class FocusTimerService {
     patch: Partial<Omit<WorkspaceSettings, 'id'>>,
   ): Promise<void> {
     const expected = this.snapshot();
-    if (this.busy() || !expected)
+    if (this.busy() || !expected || !this.ready())
       throw new Error('Focus settings are not ready');
     const generation = ++this.writeGeneration;
     this.working.set(true);
@@ -258,6 +273,12 @@ export class FocusTimerService {
 
   async retry(): Promise<void> {
     if (!this.busy()) await this.failure()?.();
+  }
+
+  async retryLoad(): Promise<void> {
+    if (!this.loadError()) return;
+    await this.reading;
+    if (this.loadError()) await this.sync(true);
   }
 
   private sample(): ClockSample {
@@ -326,7 +347,7 @@ export class FocusTimerService {
 
   private tick(now: ClockSample, checkClock = false): void {
     const active = this.snapshot()?.active;
-    if (active?.status !== 'running' || !this.anchor || this.invalid()) return;
+    if (active?.status !== 'running' || !this.anchor || !this.ready()) return;
     this.updateDisplay(active, now);
     const expired = active.plannedDurationMs !== null && this.remaining() === 0;
     if (!this.busy() && !this.hasError()) {
@@ -348,39 +369,58 @@ export class FocusTimerService {
       this.observedAt = now.monotonic;
   }
 
-  private async sync(): Promise<void> {
-    if (this.loadFailed && this.persistence.status() !== 'ready') return;
+  private sync(retry = false): Promise<void> | undefined {
+    if (
+      !retry &&
+      this.loadError() === 'unavailable' &&
+      this.persistence.status() !== 'ready'
+    )
+      return;
     if (this.busy() || this.reading) {
       this.syncQueued = true;
-      return;
+      return this.reading;
     }
     this.lastRead = performance.now();
-    this.reading = true;
-    const generation = this.writeGeneration;
-    try {
-      if (this.invalid()) {
-        await this.persistence.refreshMetadata();
-      } else {
-        const state = await this.repository.focusSnapshot();
-        if (generation === this.writeGeneration) {
-          this.adopt(state);
-          this.loadFailed = false;
-        }
-      }
-    } catch (error) {
-      if (generation === this.writeGeneration) {
-        if (error instanceof InvalidActiveSessionError) this.rejectSnapshot();
-        else this.loadFailed = true;
-      }
-    } finally {
-      this.reading = false;
-    }
-    this.tick(this.sample());
-    this.drainSync();
+    this.reading = this.readSnapshot(retry).finally(() => {
+      this.reading = undefined;
+      this.tick(this.sample());
+      this.drainSync();
+    });
+    return this.reading;
   }
 
-  private rejectSnapshot(): void {
-    this.invalid.set(true);
+  private async readSnapshot(retry: boolean): Promise<void> {
+    const previousError = this.loadError();
+    if (
+      !retry &&
+      (previousError === 'invalid' || previousError === 'invalid-record')
+    ) {
+      // Check for a replacement without retrying the invalid timer snapshot.
+      await this.persistence.refreshMetadata().catch(() => undefined);
+      return;
+    }
+    const generation = this.writeGeneration;
+    try {
+      const state = await (retry
+        ? this.persistence.retryRead(() => this.repository.focusSnapshot())
+        : this.repository.focusSnapshot());
+      if (generation !== this.writeGeneration) return;
+      this.adopt(state);
+      this.loadError.set(null);
+      if (previousError && this.history.goal() === 'error')
+        await this.history.refreshGoal();
+    } catch (error) {
+      if (generation !== this.writeGeneration) return;
+      if (error instanceof InvalidRecordError) this.rejectSnapshot(error);
+      else if (!this.snapshot() || previousError)
+        this.loadError.set('unavailable');
+    }
+  }
+
+  private rejectSnapshot(error: InvalidRecordError): void {
+    this.loadError.set(
+      error instanceof InvalidActiveSessionError ? 'invalid' : 'invalid-record',
+    );
     this.failure.set(null);
   }
 
@@ -390,8 +430,7 @@ export class FocusTimerService {
     this.anchor = undefined;
     this.observedAt = undefined;
     this.confirmRecoveryAfter = undefined;
-    this.loadFailed = false;
-    this.invalid.set(false);
+    this.loadError.set(null);
     this.failure.set(null);
     this.failedAction.set(null);
     this.conflict.set(false);
@@ -407,7 +446,7 @@ export class FocusTimerService {
 
   private command(command: TimerCommand, now: ClockSample) {
     const expected = this.snapshot();
-    return expected
+    return expected && this.ready()
       ? this.run(expected, command, this.input(now), now)
       : undefined;
   }
@@ -470,7 +509,8 @@ export class FocusTimerService {
       return state.result;
     } catch (error) {
       if (generation !== this.writeGeneration) return 'conflict';
-      if (error instanceof InvalidActiveSessionError) this.rejectSnapshot();
+      if (error instanceof InvalidActiveSessionError)
+        this.rejectSnapshot(error);
       else if (error instanceof UnavailableFocusTaskError)
         this.unavailableTask.set(true);
       else {

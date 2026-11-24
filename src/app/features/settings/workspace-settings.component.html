@@ -1,6 +1,6 @@
 @if (timer.phase() === 'loading') {
   <p role="status">{{ text().settingsLoading }}</p>
-} @else if (timer.phase() === 'invalid') {
+} @else if (!timer.ready()) {
   <p class="text-muted">{{ text().settingsUnavailable }}</p>
 } @else {
   <fieldset>

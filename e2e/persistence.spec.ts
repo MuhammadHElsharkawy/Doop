@@ -29,7 +29,7 @@ test('opens the workspace database and creates the occurrence constraint', async
   });
 
   expect(schema).toEqual({
-    version: 4,
+    version: 5,
     stores: [
       'activeSession',
       'completions',

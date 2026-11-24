@@ -23,6 +23,11 @@ export const focusMessages = {
     loading: 'Loading timer…',
     invalid:
       'The saved timer contains inconsistent timing data and cannot be recovered. Its data has been preserved.',
+    'invalid-record':
+      'A stored Focus record is invalid. It is still in storage. Retry after the record has been corrected.',
+    unavailable:
+      'Doop couldn’t load the timer. Check that browser storage is available, then retry.',
+    retryLoad: 'Retry loading timer',
     retry: 'Retry timer action',
     error: 'The timer change could not be saved. Try again.',
     resumeError: 'The session is still paused. Retry to continue it.',
@@ -86,6 +91,11 @@ export const focusMessages = {
     loading: 'جارٍ تحميل المؤقت…',
     invalid:
       'تتضمن بيانات المؤقت المحفوظة أوقاتًا غير متسقة، لذا تعذّرت استعادته. تم الاحتفاظ بالبيانات.',
+    'invalid-record':
+      'هناك سجلّ تركيز محفوظ غير صالح. ما زال السجلّ في مساحة التخزين. أعد المحاولة بعد تصحيحه.',
+    unavailable:
+      'تعذّر على Doop تحميل المؤقت. تأكّد من توفر مساحة تخزين المتصفح ثم أعد المحاولة.',
+    retryLoad: 'إعادة محاولة تحميل المؤقت',
     retry: 'إعادة محاولة إجراء المؤقت',
     error: 'تعذّر حفظ التغيير في المؤقت. حاول مجددًا.',
     resumeError: 'لا تزال الجلسة متوقفة مؤقتًا. أعد المحاولة لمتابعتها.',

@@ -8,6 +8,7 @@ import {
 import {
   InvalidRecordError,
   recordValidators,
+  restoreMissingMetadataRevision,
   upgradeLegacyHabit,
 } from '../persistence/record-validation';
 
@@ -34,7 +35,7 @@ const stores = [
   'settings',
 ] as const satisfies readonly Store[];
 
-export const workspaceVersion = 4;
+export const workspaceVersion = 5;
 type ConnectionStatus =
   'loading' | 'ready' | 'blocked' | 'connection-error' | 'migration-error';
 type OperationStatus =
@@ -100,6 +101,13 @@ async function migrate(
       revision: 0,
       preferences: legacyPreferences(),
     });
+  }
+  if (oldVersion === 4 && database.objectStoreNames.contains('metadata')) {
+    const metadata = tx.objectStore('metadata');
+    const repaired = restoreMissingMetadataRevision(
+      await metadata.get('workspace'),
+    );
+    if (repaired) await metadata.put(repaired);
   }
 }
 
@@ -257,6 +265,11 @@ export class WorkspaceDatabase {
       await this.failures.values().next().value?.retryRead?.();
       return;
     }
+    await this.retryConnection();
+  }
+
+  async retryConnection(): Promise<void> {
+    if (this.connection) return;
     const pending = this.opening;
     if (pending) {
       try {

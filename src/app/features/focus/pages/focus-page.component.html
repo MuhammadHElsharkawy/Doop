@@ -5,8 +5,13 @@
 >
   <h2 id="focus-mode" class="text-lg font-semibold">{{ heading() }}</h2>
   @let phase = timer.phase();
-  @if (phase === 'invalid') {
-    <p class="mt-4 task-error" role="alert">{{ text().invalid }}</p>
+  @if (
+    phase === 'invalid' || phase === 'invalid-record' || phase === 'unavailable'
+  ) {
+    <p class="mt-4 task-error" role="alert">{{ text()[phase] }}</p>
+    <button type="button" class="task-button mt-2" (click)="retryLoad($event)">
+      {{ text().retryLoad }}
+    </button>
   } @else if (phase === 'loading') {
     <p class="mt-4" role="status">{{ text().loading }}</p>
   } @else {

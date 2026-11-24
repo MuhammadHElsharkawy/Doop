@@ -200,7 +200,7 @@ it('upgrades v2 databases and v1 backups without guessing legacy deletion dates'
   await legacy.add('schedules', schedule);
   legacy.close();
 
-  expect((await db.open()).version).toBe(4);
+  expect((await db.open()).version).toBe(5);
   expect(await repo.habits.get('live')).toMatchObject({
     deletedLocalDate: null,
   });
