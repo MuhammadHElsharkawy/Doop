@@ -37,7 +37,9 @@ export const settingsMessages = {
     escape: 'Close the active dialog or menu.',
     arrows: 'Move between Habits tabs or through an open habit action menu.',
     localOnly:
-      'Doop stores your workspace on this device. Keep a backup before replacing or clearing it.',
+      'Doop keeps your workspace in this browser on this device. It does not send workspace data to a server or sync it across devices. Clearing site data can erase your workspace.',
+    backupGuidance:
+      'Export backups regularly and keep them somewhere safe. Browser restore accepts JSON files up to 64 MiB and may reject highly complex files. Keep your original workspace if a backup cannot be restored.',
     export: 'Export backup',
     import: 'Import backup',
     file: 'JSON backup file',
@@ -107,7 +109,9 @@ export const settingsMessages = {
     escape: 'إغلاق مربع الحوار أو القائمة المفتوحة.',
     arrows: 'التنقل بين تبويبات العادات أو داخل قائمة إجراءات عادة.',
     localOnly:
-      'يحفظ Doop مساحة عملك على هذا الجهاز. احتفظ بنسخة احتياطية قبل استبدالها أو مسحها.',
+      'يحفظ Doop مساحة عملك في هذا المتصفح على هذا الجهاز. لا يرسل بياناتها إلى خادم ولا يزامنها بين الأجهزة. قد يؤدي مسح بيانات الموقع إلى حذف مساحة عملك.',
+    backupGuidance:
+      'صدّر نسخًا احتياطية بانتظام واحتفظ بها في مكان آمن. يقبل المتصفح ملفات JSON حتى ٦٤ ميبيبايت، وقد يرفض الملفات شديدة التعقيد. احتفظ بمساحة عملك الأصلية إذا تعذّرت استعادة النسخة.',
     export: 'تصدير نسخة احتياطية',
     import: 'استيراد نسخة احتياطية',
     file: 'ملف النسخة الاحتياطية بصيغة JSON',

@@ -1,6 +1,10 @@
-<a href="#main-content" class="skip-link" (click)="skipToMain($event)">{{
-  text().skip
-}}</a>
+<a
+  href="#main-content"
+  class="skip-link"
+  tabindex="0"
+  (click)="skipToMain($event)"
+  >{{ text().skip }}</a
+>
 <div class="workspace" [class.compact]="compact()">
   <div class="sidebar">
     <div class="sidebar-header">
@@ -47,6 +51,18 @@
   </header>
 
   <main #main id="main-content" tabindex="-1">
+    @if (failedRoute(); as route) {
+      <div #navigationNotice class="notice mb-5 grid gap-2" tabindex="-1">
+        <p role="alert">{{ text().navigationError }}</p>
+        <a
+          class="settings-button justify-self-start"
+          tabindex="0"
+          [href]="route"
+          (click)="reloadCurrentPage($event, route)"
+          >{{ text().reloadPage }}</a
+        >
+      </div>
+    }
     @switch (persistence.status()) {
       @case ('loading') {
         <p class="notice mb-5" role="status">{{ text().workspaceLoading }}</p>

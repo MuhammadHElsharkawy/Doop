@@ -1,13 +1,25 @@
-﻿import {
+﻿import { Location } from '@angular/common';
+import {
+  afterNextRender,
   ChangeDetectionStrategy,
+  DOCUMENT,
   Component,
   computed,
   ElementRef,
   inject,
+  Injector,
   signal,
   viewChild,
 } from '@angular/core';
-import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import {
+  NavigationEnd,
+  NavigationError,
+  Router,
+  RouterLink,
+  RouterLinkActive,
+  RouterOutlet,
+} from '@angular/router';
 import { destinations } from './app.routes';
 import { LocalizationService } from './core/localization/localization.service';
 import { PersistenceService } from './core/persistence/persistence.service';
@@ -34,6 +46,26 @@ import { IconComponent } from './shared/ui/icon.component';
 export class AppComponent {
   constructor() {
     inject(FocusTimerService);
+    inject(Router)
+      .events.pipe(takeUntilDestroyed())
+      .subscribe((event) => {
+        if (event instanceof NavigationError) {
+          const page = new URL(this.document.URL);
+          const attempted = new URL(
+            this.location.prepareExternalUrl(event.url),
+            page,
+          );
+          this.failedRoute.set(
+            attempted.origin === page.origin ? attempted.href : page.href,
+          );
+          afterNextRender(
+            () => this.navigationNotice()?.nativeElement.focus(),
+            { injector: this.injector },
+          );
+        } else if (event instanceof NavigationEnd) {
+          this.failedRoute.set(null);
+        }
+      });
   }
 
   protected readonly text = inject(LocalizationService).text;
@@ -41,6 +73,7 @@ export class AppComponent {
   protected readonly persistence = inject(PersistenceService);
   protected readonly destinations = destinations;
   protected readonly compact = signal(false);
+  protected readonly failedRoute = signal<string | null>(null);
   protected readonly storageNotice = computed(() => {
     const text = this.text();
     switch (this.persistence.status()) {
@@ -63,6 +96,11 @@ export class AppComponent {
     }
   });
   private readonly main = viewChild<ElementRef<HTMLElement>>('main');
+  private readonly navigationNotice =
+    viewChild<ElementRef<HTMLElement>>('navigationNotice');
+  private readonly location = inject(Location);
+  private readonly document = inject(DOCUMENT);
+  private readonly injector = inject(Injector);
   private activated = false;
 
   protected toggleSidebar(): void {
@@ -78,6 +116,13 @@ export class AppComponent {
     if (this.activated)
       this.main()?.nativeElement.focus({ preventScroll: true });
     this.activated = true;
+  }
+
+  protected reloadCurrentPage(event: MouseEvent, route: string): void {
+    const page = this.document.defaultView?.location;
+    if (page?.href !== route) return;
+    event.preventDefault();
+    page.reload();
   }
 
   protected retryStorage(): void {

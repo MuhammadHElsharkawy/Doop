@@ -34,6 +34,8 @@ Doop serves students, professionals, and people building routines across desktop
 
 [Global styles](../src/styles.css) own runtime tokens. The light canvas and forest text preserve the PRD's palette. The stronger light emerald keeps active text readable. Each theme defines `--theme-light` and `--theme-dark`. The browser's color scheme resolves those values into `--accent` independently of the selected theme. Active navigation, focus outlines, selected controls, and swatches resolve from these variables. Surfaces, foregrounds and borders use semantic tokens across all six themes.
 
+Use `--control-border` for input and button boundaries that identify an interactive control. Keep the softer `--border` for decorative separators and surfaces. Angular’s production styles and the browser contrast check share the same runtime tokens.
+
 ## Typography
 
 The Doop wordmark and English headings use Georgia. Body text and Arabic headings use the system stack to keep both scripts readable without external fonts.

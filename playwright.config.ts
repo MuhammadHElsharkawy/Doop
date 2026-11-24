@@ -1,7 +1,9 @@
 import { defineConfig } from '@playwright/test';
 
 const port = 4201;
-const baseURL = `http://127.0.0.1:${port}`;
+const deployedURL = process.env['DOOP_TEST_URL'];
+const baseURL = deployedURL || `http://127.0.0.1:${port}`;
+const releaseBrowsers = process.env['DOOP_RELEASE_BROWSERS'] === '1';
 
 export default defineConfig({
   testDir: './e2e',
@@ -22,10 +24,27 @@ export default defineConfig({
         hasTouch: true,
       },
     },
+    ...(releaseBrowsers
+      ? [
+          { name: 'firefox-desktop', use: { browserName: 'firefox' as const } },
+          {
+            name: 'webkit-mobile',
+            use: {
+              browserName: 'webkit' as const,
+              viewport: { width: 390, height: 844 },
+              deviceScaleFactor: 3,
+              isMobile: true,
+              hasTouch: true,
+            },
+          },
+        ]
+      : []),
   ],
-  webServer: {
-    command: `npm run dev -- --configuration production --host 127.0.0.1 --port ${port}`,
-    url: baseURL,
-    timeout: 120_000,
-  },
+  webServer: deployedURL
+    ? undefined
+    : {
+        command: `npm run dev -- --configuration production --host 127.0.0.1 --port ${port}`,
+        url: baseURL,
+        timeout: 120_000,
+      },
 });

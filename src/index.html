@@ -11,5 +11,31 @@
   </head>
   <body>
     <app-root></app-root>
+    <main
+      id="startup-error"
+      class="notice m-4 max-w-prose"
+      tabindex="-1"
+      hidden
+    >
+      <h1 class="font-semibold">Doop</h1>
+      <p role="alert">Doop couldn’t start. Reload this page to try again.</p>
+      <p lang="ar" dir="rtl">
+        تعذّر تشغيل Doop. أعد تحميل هذه الصفحة للمحاولة مجددًا.
+      </p>
+      <a class="task-button mt-2" href=""
+        >Reload page <span lang="ar" dir="rtl">إعادة تحميل الصفحة</span></a
+      >
+    </main>
+    <noscript>
+      <main class="notice m-4 max-w-prose">
+        <h1 class="font-semibold">Doop</h1>
+        <p>
+          Enable JavaScript in this browser and reload the page to open Doop.
+        </p>
+        <p lang="ar" dir="rtl">
+          فعّل JavaScript في هذا المتصفح وأعد تحميل الصفحة لفتح Doop.
+        </p>
+      </main>
+    </noscript>
   </body>
 </html>

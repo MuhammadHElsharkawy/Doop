@@ -1,6 +1,6 @@
 # Doop
 
-Doop is a local-first productivity workspace. The responsive shell includes language, appearance, and theme settings. M2 adds the IndexedDB persistence foundation. Destination pages are marked as upcoming.
+Doop is a local-first productivity workspace for planning tasks, building habits, timing focus sessions, and reviewing progress. It stores workspace data in the current browser.
 
 ## Setup
 
@@ -40,4 +40,4 @@ Angular Router serves the five lazy destinations. Configure static hosting to fa
 
 See [AGENTS.md](AGENTS.md), the [PRD](docs/PRD.md), the [design context](docs/DESIGN.md), the [interaction contract](docs/UX-CONTRACT.md), and the [implementation roadmap](docs/03-IMPLEMENTATION-ROADMAP.md).
 
-See [Persistence and backup contracts](docs/PERSISTENCE.md) for the schema, storage behavior, and backup foundation.
+See the [persistence and backup contract](docs/PERSISTENCE.md) and the [web release runbook and acceptance checklist](docs/WEB-RELEASE.md).
