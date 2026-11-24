@@ -7,7 +7,6 @@ export const destinations = [
   'focus',
   'progress',
 ] as const;
-export type Destination = (typeof destinations)[number];
 
 export const routes: Routes = [
   { path: '', pathMatch: 'full', redirectTo: 'overview' },
@@ -39,15 +38,12 @@ export const routes: Routes = [
         (module) => module.FocusPageComponent,
       ),
   },
-  ...destinations
-    .filter((section) => section === 'progress')
-    .map((section) => ({
-      path: section,
-      data: { section },
-      loadComponent: () =>
-        import('./shared/layout/destination-page.component').then(
-          (module) => module.DestinationPageComponent,
-        ),
-    })),
+  {
+    path: 'progress',
+    loadComponent: () =>
+      import('./features/progress/pages/progress-page.component').then(
+        (module) => module.ProgressPageComponent,
+      ),
+  },
   { path: '**', redirectTo: 'overview' },
 ];

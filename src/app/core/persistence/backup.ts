@@ -56,23 +56,33 @@ const isLegacyBackup = object<LegacyBackup>({
   habits: list(isLegacyHabitRecord),
 });
 
-const maxBytes = 10 * 1024 * 1024;
+export const maxBackupBytes = 64 * 1024 * 1024;
+const maxBackupStructure = 2_000_000;
+const maxBackupDepth = 16;
 
 export type BackupDecodeResult =
   | { ok: true; backup: BackupV2 }
   | {
       ok: false;
       reason:
-        'too-large' | 'invalid-json' | 'unsupported-version' | 'invalid-data';
+        | 'too-large'
+        | 'resource-limit'
+        | 'invalid-json'
+        | 'unsupported-version'
+        | 'invalid-data';
     };
 
 export function decodeBackup(json: string): BackupDecodeResult {
   if (
-    json.length > maxBytes ||
-    new TextEncoder().encode(json).length > maxBytes
+    json.length > maxBackupBytes ||
+    (json.length > maxBackupBytes / 3 &&
+      new TextEncoder().encode(json).length > maxBackupBytes)
   ) {
     return { ok: false, reason: 'too-large' };
   }
+
+  if (exceedsStructureLimit(json))
+    return { ok: false, reason: 'resource-limit' };
 
   let value: unknown;
   try {
@@ -110,17 +120,34 @@ export function decodeBackup(json: string): BackupDecodeResult {
   return { ok: true, backup: value };
 }
 
-export function encodeBackup(backup: BackupV2): string {
-  if (!isBackup(backup) || !hasValidCollections(backup))
-    throw new TypeError('Invalid backup');
-  const json = JSON.stringify(backup);
-  if (
-    json.length > maxBytes ||
-    new TextEncoder().encode(json).length > maxBytes
-  ) {
-    throw new RangeError('Backup exceeds size limit');
+function exceedsStructureLimit(json: string): boolean {
+  let depth = 0;
+  let structure = 0;
+  let quoted = false;
+  for (let index = 0; index < json.length; index++) {
+    const character = json.charCodeAt(index);
+    if (character === 34) quoted = !quoted;
+    else if (quoted && character === 92) index++;
+    else if (!quoted) {
+      if (character === 91 || character === 123) {
+        if (++depth > maxBackupDepth) return true;
+        structure++;
+      } else if (character === 93 || character === 125) depth--;
+      else if (character === 44 || character === 58) structure++;
+      if (structure > maxBackupStructure) return true;
+    }
   }
-  return json;
+  return false;
+}
+
+export function encodeBackup(backup: BackupV2): string {
+  assertValidBackup(backup);
+  return JSON.stringify(backup);
+}
+
+export function assertValidBackup(value: unknown): asserts value is BackupV2 {
+  if (!isBackup(value) || !hasValidCollections(value))
+    throw new TypeError('Invalid backup');
 }
 
 function hasValidCollections(backup: BackupV2): boolean {

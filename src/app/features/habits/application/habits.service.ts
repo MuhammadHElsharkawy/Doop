@@ -96,6 +96,13 @@ export class HabitsService {
 
   constructor() {
     effect(() => {
+      if (!this.persistence.replacementRevision()) return;
+      untracked(() => {
+        this.state.set('loading');
+        void this.load();
+      });
+    });
+    effect(() => {
       if (
         this.persistence.status() === 'ready' &&
         untracked(this.state) === 'error'

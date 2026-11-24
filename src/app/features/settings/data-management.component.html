@@ -1,0 +1,98 @@
+<section aria-labelledby="settings-data">
+  <h3 id="settings-data" class="font-semibold">{{ text().data }}</h3>
+  <p class="mt-1 text-sm text-muted">{{ text().localOnly }}</p>
+  <div class="mt-3 flex flex-wrap gap-2">
+    <button
+      type="button"
+      class="task-button"
+      [attr.aria-disabled]="busy()"
+      (click)="export()"
+    >
+      {{ text().export }}
+    </button>
+    <button
+      #importButton
+      type="button"
+      class="task-button"
+      [attr.aria-disabled]="busy()"
+      aria-haspopup="dialog"
+      (click)="!busy() && fileInput.click()"
+    >
+      {{ text().import }}
+    </button>
+    <input
+      #fileInput
+      hidden
+      type="file"
+      accept=".json,application/json"
+      [attr.aria-label]="text().file"
+      (change)="select(fileInput, importButton)"
+    />
+    <button
+      #clearButton
+      type="button"
+      class="task-button task-danger"
+      [attr.aria-disabled]="busy()"
+      aria-haspopup="dialog"
+      (click)="clear(clearButton)"
+    >
+      {{ text().clear }}
+    </button>
+  </div>
+  @if (reading()) {
+    <p class="mt-2 text-sm" role="status">{{ text().reading }}</p>
+  }
+  @if (error(); as key) {
+    <p class="mt-2 task-error" role="alert">{{ text()[key] }}</p>
+  }
+  @if (feedback(); as key) {
+    <p class="mt-2 text-sm" role="status">{{ text()[key] }}</p>
+  }
+</section>
+
+<app-dialog
+  #confirmation
+  [heading]="
+    action()?.kind === 'clear' ? text().confirmClear : text().confirmReplace
+  "
+  [closeLabel]="locale.text().close"
+  descriptionId="data-replacement-warning"
+  [busy]="working()"
+  (closed)="action.set(null)"
+>
+  @if (action(); as operation) {
+    @if (operation.kind === 'import') {
+      <p class="mb-2 break-all">
+        <bdi>{{ operation.fileName }}</bdi>
+      </p>
+      <p id="data-replacement-warning">{{ text().replaceWarning }}</p>
+    } @else {
+      <p id="data-replacement-warning">{{ text().clearWarning }}</p>
+    }
+    @if (changeError()) {
+      <p class="mt-2 task-error" role="alert">{{ text().changeError }}</p>
+    }
+    @if (working()) {
+      <p class="mt-2 text-sm" role="status">{{ text().working }}</p>
+    }
+    <div class="mt-4 flex flex-wrap gap-2">
+      <button
+        #cancel
+        type="button"
+        class="task-button"
+        [disabled]="working()"
+        (click)="confirmation.close()"
+      >
+        {{ text().cancel }}
+      </button>
+      <button
+        type="button"
+        class="task-button task-danger"
+        [attr.aria-disabled]="working()"
+        (click)="confirm()"
+      >
+        {{ operation.kind === 'clear' ? text().clear : text().replace }}
+      </button>
+    </div>
+  }
+</app-dialog>

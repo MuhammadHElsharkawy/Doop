@@ -34,10 +34,7 @@ import {
   type TimerCommand,
   type TimerInput,
 } from '../domain/focus-timer';
-import {
-  defaultFocusSettings,
-  type BreakSettings,
-} from '../domain/focus-settings';
+import { defaultFocusSettings } from '../domain/focus-settings';
 
 @Injectable({ providedIn: 'root' })
 export class FocusTimerService {
@@ -53,6 +50,7 @@ export class FocusTimerService {
   private readonly failure = signal<(() => Promise<void>) | null>(null);
   private readonly invalid = signal(false);
   private readonly conflict = signal(false);
+  private readonly replacementConflict = signal(false);
   private readonly unavailableTask = signal(false);
   private readonly failedAction = signal<TimerCommand['type'] | null>(null);
   private anchor?: RunningAnchor;
@@ -74,6 +72,7 @@ export class FocusTimerService {
     () => this.hasError() && this.failedAction() === 'resume',
   );
   readonly changedElsewhere = this.conflict.asReadonly();
+  readonly workspaceChanged = this.replacementConflict.asReadonly();
   readonly taskUnavailable = this.unavailableTask.asReadonly();
   readonly active = computed(() => this.snapshot()?.active);
   readonly settings = computed(
@@ -101,6 +100,15 @@ export class FocusTimerService {
   );
 
   constructor() {
+    effect(() => {
+      const revision = this.persistence.replacementRevision();
+      if (!revision) return;
+      untracked(() => {
+        if (this.snapshot()?.metadata.generation !== revision)
+          this.resetForReplacement();
+        void this.sync();
+      });
+    });
     const visible = () => {
       this.observedAt = undefined;
       if (this.document.visibilityState === 'visible') void this.sync();
@@ -221,27 +229,23 @@ export class FocusTimerService {
   }
 
   async configure(
-    patch:
-      | BreakSettings
-      | Partial<
-          Pick<
-            WorkspaceSettings,
-            | 'focusDurationMinutes'
-            | 'dailyGoal'
-            | 'ambientSound'
-            | 'ambientVolume'
-          >
-        >,
+    patch: Partial<Omit<WorkspaceSettings, 'id'>>,
   ): Promise<void> {
-    if (this.busy() || !this.snapshot())
+    const expected = this.snapshot();
+    if (this.busy() || !expected)
       throw new Error('Focus settings are not ready');
-    this.writeGeneration++;
+    const generation = ++this.writeGeneration;
     this.working.set(true);
     try {
-      const settings = await this.repository.updateFocusSettings((current) => ({
-        ...(current ?? defaultFocusSettings),
-        ...patch,
-      }));
+      const settings = await this.repository.updateFocusSettings(
+        (current) => ({
+          ...(current ?? defaultFocusSettings),
+          ...patch,
+        }),
+        expected.metadata.generation,
+      );
+      if (generation !== this.writeGeneration)
+        throw new Error('The workspace was replaced');
       const state = this.snapshot();
       if (state) this.adopt({ ...state, settings });
       if ('dailyGoal' in patch) this.history.goalChanged();
@@ -264,6 +268,10 @@ export class FocusTimerService {
     state: NonNullable<ReturnType<typeof this.snapshot>>,
     committedAt?: ClockSample,
   ): void {
+    const previous = this.snapshot();
+    if (previous && previous.metadata.generation !== state.metadata.generation)
+      this.resetForReplacement();
+    this.persistence.observeMetadata(state.metadata);
     const last = this.snapshot()?.active;
     const active = state.active;
     const now = this.sample();
@@ -341,11 +349,7 @@ export class FocusTimerService {
   }
 
   private async sync(): Promise<void> {
-    if (
-      this.invalid() ||
-      (this.loadFailed && this.persistence.status() !== 'ready')
-    )
-      return;
+    if (this.loadFailed && this.persistence.status() !== 'ready') return;
     if (this.busy() || this.reading) {
       this.syncQueued = true;
       return;
@@ -354,10 +358,14 @@ export class FocusTimerService {
     this.reading = true;
     const generation = this.writeGeneration;
     try {
-      const state = await this.repository.focusSnapshot();
-      if (generation === this.writeGeneration) {
-        this.adopt(state);
-        this.loadFailed = false;
+      if (this.invalid()) {
+        await this.persistence.refreshMetadata();
+      } else {
+        const state = await this.repository.focusSnapshot();
+        if (generation === this.writeGeneration) {
+          this.adopt(state);
+          this.loadFailed = false;
+        }
       }
     } catch (error) {
       if (generation === this.writeGeneration) {
@@ -374,6 +382,21 @@ export class FocusTimerService {
   private rejectSnapshot(): void {
     this.invalid.set(true);
     this.failure.set(null);
+  }
+
+  private resetForReplacement(): void {
+    if (this.failure() || this.busy()) this.replacementConflict.set(true);
+    this.writeGeneration++;
+    this.anchor = undefined;
+    this.observedAt = undefined;
+    this.confirmRecoveryAfter = undefined;
+    this.loadFailed = false;
+    this.invalid.set(false);
+    this.failure.set(null);
+    this.failedAction.set(null);
+    this.conflict.set(false);
+    this.unavailableTask.set(false);
+    this.snapshot.set(null);
   }
 
   private drainSync(): void {
@@ -414,9 +437,10 @@ export class FocusTimerService {
   ): Promise<'committed' | 'conflict' | 'unchanged' | undefined> {
     if (this.busy()) return;
     const action = command.type;
-    this.writeGeneration++;
+    const generation = ++this.writeGeneration;
     this.working.set(true);
     this.conflict.set(false);
+    this.replacementConflict.set(false);
     if (action === 'start' || action === 'start-stopwatch')
       this.unavailableTask.set(false);
     try {
@@ -430,6 +454,7 @@ export class FocusTimerService {
         action,
         command.taskId,
       );
+      if (generation !== this.writeGeneration) return 'conflict';
       const committed = state.result === 'committed';
       this.adopt(state, committed ? at : undefined);
       this.failure.set(null);
@@ -444,6 +469,7 @@ export class FocusTimerService {
         void this.history.changed();
       return state.result;
     } catch (error) {
+      if (generation !== this.writeGeneration) return 'conflict';
       if (error instanceof InvalidActiveSessionError) this.rejectSnapshot();
       else if (error instanceof UnavailableFocusTaskError)
         this.unavailableTask.set(true);

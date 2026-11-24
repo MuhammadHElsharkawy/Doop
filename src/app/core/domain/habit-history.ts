@@ -52,7 +52,7 @@ export function nonOverlappingSchedules(
 }
 
 export function validScheduleHistory(
-  habits: readonly Habit[],
+  habits: readonly Pick<Habit, 'id'>[],
   schedules: readonly HabitSchedule[],
 ): boolean {
   const ids = new Set(habits.map(({ id }) => id));

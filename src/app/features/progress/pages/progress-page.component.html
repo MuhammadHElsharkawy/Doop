@@ -1,0 +1,333 @@
+<h1 #heading class="page-title" tabindex="-1">{{ locale.text().progress }}</h1>
+<div class="task-field mt-6 w-60 max-w-full">
+  <label for="report-period">{{ text().period }}</label>
+  <select
+    #periodSelect
+    id="report-period"
+    (change)="choose(periodSelect.value)"
+  >
+    @for (choice of periods; track choice) {
+      <option [value]="choice" [selected]="period() === choice">
+        {{ text()[choice] }}
+      </option>
+    }
+  </select>
+</div>
+@if (period() === 'custom') {
+  <form
+    class="mt-3 flex flex-wrap items-end gap-2"
+    novalidate
+    (submit)="apply($event, from, through)"
+  >
+    <div class="task-field max-w-full">
+      <label for="report-from">{{ text().from }}</label>
+      <input
+        #from
+        id="report-from"
+        type="date"
+        [max]="today()"
+        [value]="custom()?.from ?? ''"
+        [attr.aria-invalid]="invalid()"
+        [attr.aria-describedby]="invalid() ? 'report-error' : null"
+      />
+    </div>
+    <div class="task-field max-w-full">
+      <label for="report-through">{{ text().through }}</label>
+      <input
+        #through
+        id="report-through"
+        type="date"
+        [max]="today()"
+        [value]="custom()?.through ?? ''"
+        [attr.aria-invalid]="invalid()"
+        [attr.aria-describedby]="invalid() ? 'report-error' : null"
+      />
+    </div>
+    <button type="submit" class="task-button">{{ text().apply }}</button>
+  </form>
+  @if (invalid()) {
+    <p id="report-error" class="mt-2 task-error" role="alert">
+      {{ text().invalid }}
+    </p>
+  }
+}
+@let selected = range();
+@if (selected) {
+  <p class="mt-2 text-sm text-muted" role="status">
+    <time [attr.datetime]="selected.from">{{ date(selected.from) }}</time>
+    @if (selected.from !== selected.through) {
+      <span aria-hidden="true"> – </span>
+      <time [attr.datetime]="selected.through">{{
+        date(selected.through)
+      }}</time>
+    }
+  </p>
+}
+@if (state() === 'loading') {
+  <p class="notice mt-5" role="status">{{ text().loading }}</p>
+} @else if (state() === 'error') {
+  @if (!workspaceUnavailable()) {
+    <p class="task-error mt-5" role="alert">{{ text().error }}</p>
+    <button type="button" class="task-button mt-2" (click)="retry(heading)">
+      {{ text().retry }}
+    </button>
+  }
+} @else if (report(); as totals) {
+  <section class="mt-6" aria-labelledby="report-summary">
+    <div class="task-section-heading">
+      <h2 id="report-summary">{{ text().summary }}</h2>
+    </div>
+    <dl class="report-summary task-summary">
+      <div>
+        <dt>{{ text().time }}</dt>
+        <dd>{{ duration()(totals.focusSeconds) }}</dd>
+      </div>
+      <div>
+        <dt>{{ text().sessions }}</dt>
+        <dd>{{ number(totals.timers + totals.stopwatches) }}</dd>
+      </div>
+      <div>
+        <dt>{{ text().completedTasks }}</dt>
+        <dd>{{ number(totals.tasksCompleted) }}</dd>
+      </div>
+      <div>
+        <dt>{{ text().habitRate }}</dt>
+        <dd>{{ rate(totals.habitCompleted, totals.habitScheduled) }}</dd>
+      </div>
+    </dl>
+    @if (totals.uncertainHabits) {
+      <p class="mt-2 text-sm text-muted">{{ text().uncertain }}</p>
+    }
+  </section>
+  <div class="report-details mt-6 grid gap-3">
+    <section class="task-list p-4" aria-labelledby="report-focus">
+      <h2 id="report-focus" class="text-lg font-semibold">
+        {{ text().focus }}
+      </h2>
+      <dl>
+        <div>
+          <dt>{{ text().timers }}</dt>
+          <dd>{{ number(totals.timers) }}</dd>
+        </div>
+        <div>
+          <dt>{{ text().stopwatches }}</dt>
+          <dd>{{ number(totals.stopwatches) }}</dd>
+        </div>
+        <div>
+          <dt>{{ text().average }}</dt>
+          <dd>
+            {{
+              totals.timers + totals.stopwatches
+                ? duration()(
+                    totals.focusSeconds / (totals.timers + totals.stopwatches)
+                  )
+                : text().noRate
+            }}
+          </dd>
+        </div>
+      </dl>
+    </section>
+    <section class="task-list p-4" aria-labelledby="report-tasks">
+      <h2 id="report-tasks" class="text-lg font-semibold">
+        {{ text().tasks }}
+      </h2>
+      <dl>
+        <div>
+          <dt>{{ text().pending }}</dt>
+          <dd>{{ number(totals.pending) }}</dd>
+        </div>
+        <div>
+          <dt>{{ text().overdue }}</dt>
+          <dd>{{ number(totals.overdue) }}</dd>
+        </div>
+        <div>
+          <dt>{{ text().taskRate }}</dt>
+          <dd>
+            {{
+              rate(
+                totals.currentCompleted,
+                totals.currentCompleted + totals.pending
+              )
+            }}
+          </dd>
+        </div>
+      </dl>
+      @if (totals.completedTaskHistory.length) {
+        <details class="mt-3">
+          <summary>{{ text().recentTasks }}</summary>
+          <ul class="mt-2 grid gap-2 text-sm">
+            @for (
+              row of totals.completedTaskHistory.slice(0, 5);
+              track row.task.id
+            ) {
+              <li>
+                <span class="break-words"
+                  ><bdi>{{ row.task.title }}</bdi></span
+                >
+                @if (row.task.deletedAt) {
+                  <span class="text-muted"> · {{ text().removed }}</span>
+                }
+                <time class="block text-muted" [attr.datetime]="row.date">{{
+                  date(row.date)
+                }}</time>
+              </li>
+            }
+          </ul>
+        </details>
+      }
+    </section>
+    <section class="task-list p-4" aria-labelledby="report-habits">
+      <h2 id="report-habits" class="text-lg font-semibold">
+        {{ text().habits }}
+      </h2>
+      <dl>
+        <div>
+          <dt>{{ text().scheduled }}</dt>
+          <dd>{{ number(totals.habitScheduled) }}</dd>
+        </div>
+        <div>
+          <dt>{{ text().done }}</dt>
+          <dd>{{ number(totals.habitCompleted) }}</dd>
+        </div>
+      </dl>
+    </section>
+  </div>
+
+  <section class="mt-6" aria-labelledby="report-trend">
+    <div class="task-section-heading">
+      <h2 id="report-trend">{{ text().trend }}</h2>
+    </div>
+    @if (
+      totals.focusSeconds || totals.tasksCompleted || totals.habitScheduled
+    ) {
+      <table class="trend">
+        <caption class="sr-only">
+          {{
+            text().trend
+          }}
+        </caption>
+        <thead>
+          <tr>
+            <th scope="col">{{ text().date }}</th>
+            <th scope="col">{{ text().time }}</th>
+            <th scope="col">{{ text().completedTasks }}</th>
+            <th scope="col">{{ text().habits }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (row of daily(); track row.date) {
+            <tr>
+              <th scope="row">
+                <time [attr.datetime]="row.date">{{ date(row.date) }}</time>
+              </th>
+              <td>
+                {{ duration()(row.focusSeconds)
+                }}<span
+                  aria-hidden="true"
+                  class="trend-bar"
+                  [style.inline-size.%]="(row.focusSeconds / peak()) * 100"
+                ></span>
+              </td>
+              <td>{{ number(row.tasksCompleted) }}</td>
+              <td>{{ ratio(row.completed, row.scheduled) }}</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+      @if (pageRange(); as displayed) {
+        @if (displayed.from !== selected?.from || page() > 0) {
+          <div class="mt-3 flex flex-wrap gap-2">
+            <button
+              class="task-button"
+              type="button"
+              [attr.aria-disabled]="displayed.from === selected?.from"
+              (click)="
+                displayed.from !== selected?.from && page.set(page() + 1)
+              "
+            >
+              {{ text().older }}
+            </button>
+            <button
+              class="task-button"
+              type="button"
+              [attr.aria-disabled]="page() === 0"
+              (click)="page() > 0 && page.set(page() - 1)"
+            >
+              {{ text().newer }}
+            </button>
+          </div>
+        }
+      }
+    } @else {
+      <p class="notice text-muted">{{ text().empty }}</p>
+    }
+  </section>
+
+  <section class="mt-6" aria-labelledby="report-by-habit">
+    <div class="task-section-heading">
+      <h2 id="report-by-habit">{{ text().perHabit }}</h2>
+    </div>
+    @if (totals.habits.length) {
+      <ul class="task-list">
+        @for (row of totals.habits; track row.habit.id) {
+          <li class="task-row">
+            <div class="min-w-0">
+              <p class="task-name" dir="auto">{{ row.habit.name }}</p>
+              @if (row.habit.deletedAt || row.habit.status === 'archived') {
+                <p class="text-sm text-muted">
+                  {{ row.habit.deletedAt ? text().removed : text().archived }}
+                </p>
+              }
+              @if (row.recentScheduled.length) {
+                <details class="mt-2 text-sm">
+                  <summary>{{ text().recentScheduled }}</summary>
+                  <ul>
+                    @for (
+                      completion of row.recentScheduled;
+                      track completion.id
+                    ) {
+                      <li>
+                        <time [attr.datetime]="completion.scheduledDate">{{
+                          date(completion.scheduledDate)
+                        }}</time>
+                      </li>
+                    }
+                  </ul>
+                </details>
+              }
+            </div>
+            <span>{{
+              row.totals.eligible === null
+                ? text().noRate
+                : ratio(row.totals.completed, row.totals.eligible)
+            }}</span>
+          </li>
+        }
+      </ul>
+    } @else {
+      <p class="notice text-muted">{{ text().empty }}</p>
+    }
+  </section>
+
+  <section class="mt-6" aria-labelledby="report-recent">
+    <div class="task-section-heading">
+      <h2 id="report-recent">{{ text().recent }}</h2>
+    </div>
+    @if (totals.recent.length) {
+      <ul class="task-list">
+        @for (row of totals.recent.slice(0, 10); track row.id) {
+          <li class="task-row">
+            <span class="task-name" dir="auto">{{
+              row.habitNameSnapshot
+            }}</span>
+            <time [attr.datetime]="row.scheduledDate">{{
+              date(row.scheduledDate)
+            }}</time>
+          </li>
+        }
+      </ul>
+    } @else {
+      <p class="notice text-muted">{{ text().noHistory }}</p>
+    }
+  </section>
+}

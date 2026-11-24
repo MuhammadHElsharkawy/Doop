@@ -1,5 +1,15 @@
-import { DestroyRef, inject, Injectable, signal } from '@angular/core';
+import {
+  computed,
+  DestroyRef,
+  effect,
+  inject,
+  Injectable,
+  signal,
+  untracked,
+} from '@angular/core';
+import { PersistenceService } from '../../../core/persistence/persistence.service';
 import { type AmbientSound, renderAmbient } from '../domain/ambient-audio';
+import { FocusTimerService } from './focus-timer.service';
 
 @Injectable({ providedIn: 'root' })
 export class AmbientPlayerService {
@@ -16,6 +26,21 @@ export class AmbientPlayerService {
   readonly sound = this.track.asReadonly();
 
   constructor() {
+    const timer = inject(FocusTimerService);
+    const persistence = inject(PersistenceService);
+    const preferredSound = computed(() => timer.settings().ambientSound);
+    const preferredVolume = computed(() => timer.settings().ambientVolume);
+    effect(() => {
+      const sound = preferredSound();
+      const volume = preferredVolume();
+      untracked(() => {
+        if (this.sound() && this.sound() !== sound) this.stop();
+        this.setVolume(volume);
+      });
+    });
+    effect(() => {
+      if (persistence.replacementRevision()) untracked(() => this.stop());
+    });
     inject(DestroyRef).onDestroy(() => {
       this.stop();
       void this.context?.close().catch(() => undefined);

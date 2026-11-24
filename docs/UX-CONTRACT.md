@@ -12,7 +12,13 @@ The [PRD](PRD.md) and [milestone roadmap](03-IMPLEMENTATION-ROADMAP.md) define p
 | Scrollbar       | Global stylesheet                     | Uses tokenized colors with the platform fallback in forced colors.                                                                                                                                                             | Global CSS                        |
 | Preferences     | Preferences and localization services | Settings apply immediately and persist locally. Language updates copy, document direction and route titles. Appearance and palette are independent. A failed write keeps preferences usable in-session and displays a warning. | Unit and browser preference tests |
 
-Tasks and Overview share one TaskForm and the shell dialog. The form uses the dialog's full-height sheet variant on mobile. Saving closes the dialog and keeps the originating view. Failed writes preserve the draft. Deletion uses the same dialog with Cancel focused first. Overview shows up to five unfinished tasks and offers undo for its most recent completion while the view remains open. Progress retains its clearly labeled placeholder.
+Tasks and Overview share one TaskForm and the shell dialog. The form uses the dialog's full-height sheet variant on mobile. Saving closes the dialog and keeps the originating view. Failed writes preserve the draft. Deletion uses the same dialog with Cancel focused first. Overview shows up to five unfinished tasks and offers undo for its most recent completion while the view remains open.
+
+Progress opens on the last seven days. Presets use the local calendar and custom dates use native date inputs. The report shows its selected period above the totals. Large custom periods show the full-period totals with daily activity paged by 30 days. Each chart value is also available as text in the daily activity table.
+
+Settings extends the shell dialog with autosaved timer and sound fields, a reference for existing keyboard interactions, and local data actions. Import and Clear All Data use the shared confirmation dialog with Cancel focused first. Invalid files stay outside confirmation. Replacement errors leave confirmation open for retry or cancellation.
+
+Destructive confirmation dialogs expose the warning as their accessible description. Backup feedback distinguishes imports that exceed the browser restore budget from invalid backup data. A replacement invalidates pending timer actions, including in a tab that missed the notification.
 
 Overview shows the local greeting and date, then the three Daily Summary metrics. Today's Tasks and Today's Habits sit side by side on desktop and stack on smaller screens. Focus Goal and Quick Actions follow them. Add Task and Add Habit open their shared editors and return focus to the launcher. Start Focus is a navigation link. Unavailable metrics show an unavailable state, and focus data can be retried without hiding the planning sections.
 

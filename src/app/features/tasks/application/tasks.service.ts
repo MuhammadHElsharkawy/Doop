@@ -14,6 +14,7 @@ import { createRecordId } from '../../../core/domain/record-id';
 import type { Task } from '../../../core/domain/workspace-records';
 import { FocusHistoryService } from '../../../core/persistence/focus-history.service';
 import { PersistenceService } from '../../../core/persistence/persistence.service';
+import { taskViewKey as viewKey } from '../../../core/preferences/preferences.service';
 import {
   countTaskSessions,
   filters,
@@ -27,7 +28,6 @@ import {
 } from '../domain/task-rules';
 
 type View = { filter: TaskFilter; sort: TaskSort };
-const viewKey = 'doop.tasks.view';
 
 @Injectable({ providedIn: 'root' })
 export class TasksService {
@@ -77,6 +77,14 @@ export class TasksService {
   });
 
   constructor() {
+    effect(() => {
+      if (!this.persistence.replacementRevision()) return;
+      untracked(() => {
+        this.viewState.set(this.readView());
+        this.state.set('loading');
+        void this.load();
+      });
+    });
     effect(() => {
       if (this.persistence.status() === 'ready' && this.state() === 'error') {
         untracked(() => void this.load());

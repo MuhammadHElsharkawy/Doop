@@ -17,12 +17,13 @@ export interface Preferences {
   language: (typeof languages)[number];
 }
 
-const defaults: Preferences = {
+export const defaultPreferences: Preferences = {
   appearance: 'system',
   theme: 'emerald',
   language: 'en',
 };
 const storageKey = 'doop.preferences';
+export const taskViewKey = 'doop.tasks.view';
 
 function isChoice<T extends string>(
   choices: readonly T[],
@@ -33,21 +34,21 @@ function isChoice<T extends string>(
 
 export function parsePreferences(raw: string): Preferences {
   const value: unknown = JSON.parse(raw);
-  if (typeof value !== 'object' || value === null) return defaults;
+  if (typeof value !== 'object' || value === null) return defaultPreferences;
 
   return {
     appearance:
       'appearance' in value && isChoice(appearances, value.appearance)
         ? value.appearance
-        : defaults.appearance,
+        : defaultPreferences.appearance,
     theme:
       'theme' in value && isChoice(themes, value.theme)
         ? value.theme
-        : defaults.theme,
+        : defaultPreferences.theme,
     language:
       'language' in value && isChoice(languages, value.language)
         ? value.language
-        : defaults.language,
+        : defaultPreferences.language,
   };
 }
 
@@ -55,7 +56,15 @@ export function parsePreferences(raw: string): Preferences {
 export class PreferencesService {
   private readonly document = inject(DOCUMENT);
   private readonly storageError = signal(false);
-  private readonly state = signal(this.read());
+  private readonly state = signal(
+    this.legacyPreferences() ?? defaultPreferences,
+  );
+  private commit?: (
+    key: keyof Preferences,
+    value: Preferences[keyof Preferences],
+  ) => Promise<Preferences>;
+  private edit = 0;
+  private pending = false;
 
   readonly current = this.state.asReadonly();
   readonly storageUnavailable = this.storageError.asReadonly();
@@ -71,16 +80,49 @@ export class PreferencesService {
     });
   }
 
-  set<K extends keyof Preferences>(key: K, value: Preferences[K]): void {
-    const next = { ...this.state(), [key]: value };
-    this.state.set(next);
+  connect(commit: NonNullable<PreferencesService['commit']>): void {
+    this.commit = commit;
+  }
 
-    try {
-      this.storage().setItem(storageKey, JSON.stringify(next));
+  adopt(value: Preferences, replaced = false): void {
+    if (replaced) {
+      this.edit++;
+      this.pending = false;
       this.storageError.set(false);
-    } catch {
-      this.storageError.set(true);
     }
+    if (!this.pending && !this.storageError()) this.state.set(value);
+    try {
+      const storage = this.storage();
+      if (replaced) storage.removeItem(taskViewKey);
+      storage.setItem(storageKey, JSON.stringify(value));
+    } catch {
+      // The synchronous theme cache and the task view are presentation only.
+    }
+  }
+
+  set<K extends keyof Preferences>(key: K, value: Preferences[K]): void {
+    const request = ++this.edit;
+    this.pending = true;
+    this.state.update((current) => ({ ...current, [key]: value }));
+    const commit = this.commit;
+    if (!commit) {
+      this.pending = false;
+      this.storageError.set(true);
+      return;
+    }
+    void commit(key, value).then(
+      (saved) => {
+        if (request !== this.edit) return;
+        this.pending = false;
+        this.storageError.set(false);
+        this.adopt(saved);
+      },
+      () => {
+        if (request !== this.edit) return;
+        this.pending = false;
+        this.storageError.set(true);
+      },
+    );
   }
 
   private storage(): Storage {
@@ -89,13 +131,17 @@ export class PreferencesService {
     return storage;
   }
 
-  private read(): Preferences {
+  legacyPreferences(): Preferences | null {
+    let raw: string | null;
     try {
-      const raw = this.storage().getItem(storageKey);
-      return raw === null ? defaults : parsePreferences(raw);
+      raw = this.storage().getItem(storageKey);
     } catch {
-      this.storageError.set(true);
-      return defaults;
+      return null;
+    }
+    try {
+      return raw === null ? defaultPreferences : parsePreferences(raw);
+    } catch {
+      return defaultPreferences;
     }
   }
 }

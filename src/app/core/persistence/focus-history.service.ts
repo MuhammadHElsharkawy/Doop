@@ -40,6 +40,16 @@ export class FocusHistoryService {
 
   constructor() {
     effect(() => {
+      if (!this.persistence.replacementRevision()) return;
+      untracked(() => {
+        this.rows.set(null);
+        this.state.set('loading');
+        this.target.set('loading');
+        void this.refresh();
+        void this.refreshGoal();
+      });
+    });
+    effect(() => {
       if (this.persistence.status() !== 'ready' || this.retrying) return;
       untracked(() => {
         if (this.status() === 'error') void this.refresh();

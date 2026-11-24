@@ -158,26 +158,62 @@ describe('M5 focus timer', () => {
     try {
       const running = activeAfter(undefined, 'start', start);
       await repo.updateFocus(
-        { active: undefined, cycle: undefined },
+        {
+          active: undefined,
+          cycle: undefined,
+          metadata: {
+            id: 'workspace',
+            generation: 0,
+            revision: 0,
+            preferences: null,
+          },
+        },
         () => ({ active: running }),
         'start',
       );
       const paused = activeAfter(running, 'pause', start + 1000, 1000);
       await repo.updateFocus(
-        { active: running, cycle: undefined },
+        {
+          active: running,
+          cycle: undefined,
+          metadata: {
+            id: 'workspace',
+            generation: 0,
+            revision: 0,
+            preferences: null,
+          },
+        },
         () => ({ active: paused }),
         'pause',
       );
       const resumed = activeAfter(paused, 'resume', start + 3000);
       await repo.updateFocus(
-        { active: paused, cycle: undefined },
+        {
+          active: paused,
+          cycle: undefined,
+          metadata: {
+            id: 'workspace',
+            generation: 0,
+            revision: 0,
+            preferences: null,
+          },
+        },
         () => ({ active: resumed }),
         'resume',
       );
       expect(
         (
           await peer.updateFocus(
-            { active: running, cycle: undefined },
+            {
+              active: running,
+              cycle: undefined,
+              metadata: {
+                id: 'workspace',
+                generation: 0,
+                revision: 0,
+                preferences: null,
+              },
+            },
             () => ({ active: paused }),
             'pause',
           )
@@ -186,7 +222,16 @@ describe('M5 focus timer', () => {
       expect(
         (
           await peer.updateFocus(
-            { active: paused, cycle: undefined },
+            {
+              active: paused,
+              cycle: undefined,
+              metadata: {
+                id: 'workspace',
+                generation: 0,
+                revision: 0,
+                preferences: null,
+              },
+            },
             () => ({ active: resumed }),
             'resume',
           )
@@ -198,12 +243,30 @@ describe('M5 focus timer', () => {
         change(resumed, 'recover', start + 9_000_000, focusDurationMs);
       const results = await Promise.all([
         repo.updateFocus(
-          { active: resumed, cycle: undefined },
+          {
+            active: resumed,
+            cycle: undefined,
+            metadata: {
+              id: 'workspace',
+              generation: 0,
+              revision: 0,
+              preferences: null,
+            },
+          },
           recover,
           'recover',
         ),
         peer.updateFocus(
-          { active: resumed, cycle: undefined },
+          {
+            active: resumed,
+            cycle: undefined,
+            metadata: {
+              id: 'workspace',
+              generation: 0,
+              revision: 0,
+              preferences: null,
+            },
+          },
           recover,
           'recover',
         ),
@@ -234,7 +297,16 @@ it('commits automatic breaks with focus history and cycle, or rolls all three ba
   try {
     const running = activeAfter(undefined, 'start', start);
     await repo.updateFocus(
-      { active: undefined, cycle: undefined },
+      {
+        active: undefined,
+        cycle: undefined,
+        metadata: {
+          id: 'workspace',
+          generation: 0,
+          revision: 0,
+          preferences: null,
+        },
+      },
       () => ({ active: running }),
       'start',
     );

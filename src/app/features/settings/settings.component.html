@@ -59,4 +59,39 @@
       }
     </div>
   </fieldset>
+  <app-workspace-settings />
+  <section aria-labelledby="settings-shortcuts">
+    <h3 id="settings-shortcuts" class="font-semibold">
+      {{ details().shortcuts }}
+    </h3>
+    <dl class="mt-2 grid gap-2 text-sm">
+      <div>
+        <dt class="font-semibold">
+          <bdi dir="ltr">
+            <kbd>Tab</kbd> / <kbd>Shift</kbd> + <kbd>Tab</kbd>
+          </bdi>
+        </dt>
+        <dd>{{ details().tab }}</dd>
+      </div>
+      <div>
+        <dt class="font-semibold">
+          <bdi dir="ltr"><kbd>Enter</kbd> / <kbd>Space</kbd></bdi>
+        </dt>
+        <dd>{{ details().activate }}</dd>
+      </div>
+      <div>
+        <dt class="font-semibold"><kbd>Escape</kbd></dt>
+        <dd>{{ details().escape }}</dd>
+      </div>
+      <div>
+        <dt class="font-semibold">
+          <bdi dir="ltr">
+            <kbd>←</kbd> <kbd>→</kbd> <kbd>↑</kbd> <kbd>↓</kbd>
+          </bdi>
+        </dt>
+        <dd>{{ details().arrows }}</dd>
+      </div>
+    </dl>
+  </section>
+  <app-data-management />
 </div>

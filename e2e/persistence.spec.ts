@@ -29,12 +29,13 @@ test('opens the workspace database and creates the occurrence constraint', async
   });
 
   expect(schema).toEqual({
-    version: 3,
+    version: 4,
     stores: [
       'activeSession',
       'completions',
       'cycle',
       'habits',
+      'metadata',
       'schedules',
       'sessions',
       'settings',

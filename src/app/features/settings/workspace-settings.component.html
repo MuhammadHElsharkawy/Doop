@@ -1,0 +1,118 @@
+@if (timer.phase() === 'loading') {
+  <p role="status">{{ text().settingsLoading }}</p>
+} @else if (timer.phase() === 'invalid') {
+  <p class="text-muted">{{ text().settingsUnavailable }}</p>
+} @else {
+  <fieldset>
+    <legend class="mb-2 font-semibold">{{ text().focus }}</legend>
+    <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+      @for (field of fields; track field.key) {
+        <div class="task-field">
+          <label [for]="'settings-' + field.key">{{
+            text()[field.label]
+          }}</label>
+          <input
+            #numeric
+            [id]="'settings-' + field.key"
+            type="number"
+            [min]="field.min"
+            [max]="field.max"
+            [step]="field.step"
+            [value]="pending()?.[field.key] ?? timer.settings()[field.key]"
+            [attr.aria-invalid]="invalid()[field.key] ?? false"
+            [attr.aria-describedby]="
+              invalid()[field.key] ? 'setting-error-' + field.key : null
+            "
+            (change)="numberChanged(field, numeric)"
+          />
+          @if (invalid()[field.key]) {
+            <p
+              [id]="'setting-error-' + field.key"
+              class="task-error"
+              role="alert"
+            >
+              {{ text()[field.error] }}
+            </p>
+          }
+        </div>
+      }
+      <div class="task-field">
+        <label for="settings-transition">{{ text().transition }}</label>
+        <select
+          #transitionInput
+          id="settings-transition"
+          (change)="transition(transitionInput.value)"
+        >
+          @let transitionValue =
+            pending()?.breakTransition ?? timer.settings().breakTransition;
+          <option
+            value="automatic"
+            [selected]="transitionValue === 'automatic'"
+          >
+            {{ text().automatic }}
+          </option>
+          <option value="manual" [selected]="transitionValue === 'manual'">
+            {{ text().manual }}
+          </option>
+        </select>
+      </div>
+    </div>
+  </fieldset>
+  <fieldset class="mt-5">
+    <legend class="mb-2 font-semibold">{{ text().sound }}</legend>
+    <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+      <div class="task-field">
+        <label for="settings-sound">{{ text().soundChoice }}</label>
+        <select
+          #soundInput
+          id="settings-sound"
+          (change)="sound(soundInput.value)"
+        >
+          @let draft = pending()?.ambientSound;
+          @let activeSound =
+            draft === undefined ? timer.settings().ambientSound : draft;
+          <option value="" [selected]="activeSound === null">
+            {{ text().none }}
+          </option>
+          @for (choice of sounds; track choice) {
+            <option [value]="choice" [selected]="activeSound === choice">
+              {{ text()[choice] }}
+            </option>
+          }
+        </select>
+      </div>
+      <div class="task-field">
+        <label for="settings-volume">{{ text().volume }}</label>
+        <input
+          #volumeInput
+          id="settings-volume"
+          type="number"
+          min="0"
+          max="100"
+          step="1"
+          [value]="pending()?.ambientVolume ?? timer.settings().ambientVolume"
+          [attr.aria-invalid]="invalid().ambientVolume ?? false"
+          [attr.aria-describedby]="
+            invalid().ambientVolume ? 'settings-volume-error' : null
+          "
+          (change)="numberChanged(volumeField, volumeInput)"
+        />
+        @if (invalid().ambientVolume) {
+          <p id="settings-volume-error" class="task-error" role="alert">
+            {{ text().invalidVolume }}
+          </p>
+        }
+      </div>
+    </div>
+  </fieldset>
+  @if (saving()) {
+    <p class="mt-2 text-sm text-muted" role="status">{{ text().saving }}</p>
+  } @else if (pending()) {
+    <p class="mt-2 task-error" role="alert">{{ text().saveError }}</p>
+    <button type="button" class="task-button mt-2" (click)="save(pending())">
+      {{ text().retry }}
+    </button>
+  } @else if (saved()) {
+    <p class="mt-2 text-sm text-muted" role="status">{{ text().saved }}</p>
+  }
+}

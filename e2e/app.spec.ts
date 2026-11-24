@@ -161,12 +161,15 @@ test('applies all six themes, independent appearance, and persistent RTL prefere
   expect(await accent()).toBeTruthy();
 });
 
-test('keeps settings usable when local storage rejects writes', async ({
+test('keeps settings usable when IndexedDB rejects preference writes', async ({
   page,
 }) => {
   await page.addInitScript(() => {
-    Storage.prototype.setItem = () => {
-      throw new DOMException('Storage is unavailable', 'QuotaExceededError');
+    const put = IDBObjectStore.prototype.put;
+    IDBObjectStore.prototype.put = function (record, key) {
+      if (this.name === 'metadata')
+        throw new DOMException('Storage is unavailable', 'QuotaExceededError');
+      return put.call(this, record, key);
     };
   });
   await page.goto('/');
@@ -176,5 +179,10 @@ test('keeps settings usable when local storage rejects writes', async ({
   await expect(dialog.getByRole('alert')).toContainText('Changes may be lost');
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'slate');
   await page.keyboard.press('Escape');
-  await expect(page.getByRole('main').getByRole('alert')).toBeVisible();
+  await expect(
+    page
+      .getByRole('main')
+      .getByRole('alert')
+      .filter({ hasText: 'Changes may be lost' }),
+  ).toBeVisible();
 });

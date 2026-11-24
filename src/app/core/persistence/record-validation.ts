@@ -350,6 +350,12 @@ export const recordValidators: {
   ),
   activeSession: validActiveSession,
   cycle: (value): value is Cycle => legacyCycle(value) || versionedCycle(value),
+  metadata: object<WorkspaceRecords['metadata']>({
+    id: choice('workspace'),
+    generation: nonnegativeInt,
+    revision: nonnegativeInt,
+    preferences: nullable(isPreferences),
+  }),
   settings: object<WorkspaceRecords['settings']>({
     id: choice('settings'),
     weekStartsOn: nullable(choice(0, 1, 6)),

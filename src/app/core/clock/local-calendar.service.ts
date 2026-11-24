@@ -14,10 +14,18 @@ export class LocalCalendarService {
   private readonly localHour = signal(new Date().getHours());
   readonly today = this.date.asReadonly();
   readonly hour = this.localHour.asReadonly();
+  private readonly zone = signal(this.zoneKey(new Date()));
+  readonly timeZone = this.zone.asReadonly();
 
   constructor() {
     const refresh = () => this.refresh();
-    const tick = setInterval(refresh, 1000);
+    let tickCount = 0;
+    const tick = setInterval(() => {
+      const now = new Date();
+      this.refreshDate(now);
+      if (++tickCount % 2 === 0 && this.document.visibilityState === 'visible')
+        this.zone.set(this.zoneKey(now));
+    }, 1000);
     const window = this.document.defaultView;
     this.document.addEventListener('visibilitychange', refresh);
     window?.addEventListener('focus', refresh);
@@ -31,7 +39,20 @@ export class LocalCalendarService {
   }
 
   refresh(now = new Date()): void {
+    this.refreshDate(now);
+    this.zone.set(this.zoneKey(now));
+  }
+
+  private refreshDate(now: Date): void {
     this.date.set(toLocalDate(now));
     this.localHour.set(now.getHours());
+  }
+
+  private zoneKey(now: Date): string {
+    return (
+      Intl.DateTimeFormat().resolvedOptions().timeZone +
+      '/' +
+      now.getTimezoneOffset()
+    );
   }
 }

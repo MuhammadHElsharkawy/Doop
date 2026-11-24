@@ -1193,6 +1193,8 @@ Export:
 
 -   Provide a versioned JSON backup containing the user's local
     application data.
+-   Export all valid stored records. Explain when a download exceeds the
+    browser restore budget.
 -   Include tasks, habits, habit schedule history, habit completion
     records, focus session history, and settings.
 -   Do not include transient runtime-only data that cannot be safely
@@ -1201,6 +1203,8 @@ Export:
 Import:
 
 -   Validate the backup format and schema version before applying it.
+-   Enforce the documented browser restore budget before parsing or
+    applying an oversized or overly complex file.
 -   Explain that importing replaces the current local application data.
 -   Require explicit confirmation before replacement.
 -   Do not partially overwrite data if validation fails.
@@ -1466,6 +1470,9 @@ Recommended storage responsibilities:
     apply.
 -   Recalculate current-day views when the local date or timezone
     changes, without rewriting historical event dates.
+-   Preserve valid UTC timestamps whose local projected dates fall
+    outside the supported calendar range. Omit them from date-filtered
+    task totals.
 -   Do not use a date-time timestamp where a date-only value is
     required.
 

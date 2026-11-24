@@ -122,6 +122,7 @@ Use transactions for multi-record updates (e.g., completion + cycle state + acti
 - Show a clear local-only storage warning and accessible export/import controls.
 - JSON export contains format ID, format version, export timestamp, and supported entities/settings. Exclude transient sound playback state unless required.
 - Validate the entire import before mutating local data; confirm replacement; apply atomically where possible; show actionable error on failure.
+- Keep the workspace generation and authoritative appearance preferences in IndexedDB so backup snapshots and workspace replacement include them in their transaction. Treat localStorage as a startup cache.
 - Do not pretend that browser local storage automatically synchronizes with native storage. Design adapters and compatible export formats for later migration.
 
 ## 6. Time and focus engine

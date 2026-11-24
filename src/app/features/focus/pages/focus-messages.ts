@@ -28,6 +28,8 @@ export const focusMessages = {
     resumeError: 'The session is still paused. Retry to continue it.',
     conflict:
       'The timer changed in another tab. Review its current state and try again.',
+    workspaceChanged:
+      'Workspace data was replaced. Start a new timer action if needed.',
     duration: 'Focus duration',
     custom: 'Custom duration',
     hours: 'Hours',
@@ -89,6 +91,8 @@ export const focusMessages = {
     resumeError: 'لا تزال الجلسة متوقفة مؤقتًا. أعد المحاولة لمتابعتها.',
     conflict:
       'تغيّر المؤقت في علامة تبويب أخرى. راجع حالته الحالية وحاول مجددًا.',
+    workspaceChanged:
+      'تم استبدال بيانات مساحة العمل. ابدأ إجراءً جديدًا للمؤقت إذا لزم الأمر.',
     duration: 'مدة التركيز',
     custom: 'مدة مخصصة',
     hours: 'الساعات',

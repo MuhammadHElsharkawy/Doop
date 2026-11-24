@@ -2,6 +2,10 @@
 import { validScheduleHistory } from '../domain/habit-history';
 import type { WorkspaceRecords } from '../domain/workspace-records';
 import {
+  defaultPreferences,
+  type Preferences,
+} from '../preferences/preferences.service';
+import {
   InvalidRecordError,
   recordValidators,
   upgradeLegacyHabit,
@@ -30,7 +34,7 @@ const stores = [
   'settings',
 ] as const satisfies readonly Store[];
 
-export const workspaceVersion = 3;
+export const workspaceVersion = 4;
 type ConnectionStatus =
   'loading' | 'ready' | 'blocked' | 'connection-error' | 'migration-error';
 type OperationStatus =
@@ -56,6 +60,7 @@ async function migrate(
   database: IDBPDatabase<WorkspaceSchema>,
   oldVersion: number,
   tx: IDBPTransaction<WorkspaceSchema, Store[], 'versionchange'>,
+  legacyPreferences: () => Preferences | null,
 ): Promise<void> {
   if (oldVersion < 1) {
     for (const name of stores)
@@ -71,20 +76,30 @@ async function migrate(
   if (oldVersion < 3) {
     const schedules = tx.objectStore('schedules');
     schedules.createIndex('byHabit', 'habitId');
-    if (oldVersion === 0) return;
-    const habits = tx.objectStore('habits');
-    const [habitRows, scheduleRows] = await Promise.all([
-      habits.getAll(),
-      schedules.getAll(),
-    ]);
-    const upgraded = habitRows.map(upgradeLegacyHabit);
-    if (
-      !scheduleRows.every(recordValidators.schedules) ||
-      !validScheduleHistory(upgraded, scheduleRows)
-    ) {
-      throw new InvalidRecordError('Invalid legacy schedule history');
+    if (oldVersion > 0) {
+      const habits = tx.objectStore('habits');
+      const [habitRows, scheduleRows] = await Promise.all([
+        habits.getAll(),
+        schedules.getAll(),
+      ]);
+      const upgraded = habitRows.map(upgradeLegacyHabit);
+      if (
+        !scheduleRows.every(recordValidators.schedules) ||
+        !validScheduleHistory(upgraded, scheduleRows)
+      ) {
+        throw new InvalidRecordError('Invalid legacy schedule history');
+      }
+      await Promise.all(upgraded.map((habit) => habits.put(habit)));
     }
-    await Promise.all(upgraded.map((habit) => habits.put(habit)));
+  }
+  if (oldVersion < 4) {
+    const metadata = database.createObjectStore('metadata', { keyPath: 'id' });
+    await metadata.add({
+      id: 'workspace',
+      generation: 0,
+      revision: 0,
+      preferences: legacyPreferences(),
+    });
   }
 }
 
@@ -99,6 +114,8 @@ export class WorkspaceDatabase {
     private readonly name = 'doop-workspace',
     private readonly onStatus: (status: StorageStatus) => void = () =>
       undefined,
+    private readonly legacyPreferences: () => Preferences | null = () =>
+      defaultPreferences,
   ) {}
 
   open(): Promise<IDBPDatabase<WorkspaceSchema>> {
@@ -185,9 +202,14 @@ export class WorkspaceDatabase {
         this.name,
         workspaceVersion,
         {
-          upgrade(database, oldVersion, _newVersion, tx) {
+          upgrade: (database, oldVersion, _newVersion, tx) => {
             void tx.done.catch(() => undefined);
-            void migrate(database, oldVersion, tx).catch((error: unknown) => {
+            void migrate(
+              database,
+              oldVersion,
+              tx,
+              this.legacyPreferences,
+            ).catch((error: unknown) => {
               migrationFailure = error;
               try {
                 tx.abort();
@@ -245,5 +267,10 @@ export class WorkspaceDatabase {
       }
     }
     await this.open();
+  }
+
+  resetOperationFailures(): void {
+    this.failures.clear();
+    this.report();
   }
 }

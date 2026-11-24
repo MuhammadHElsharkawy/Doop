@@ -1,6 +1,6 @@
 import 'fake-indexeddb/auto';
 import { openDB } from 'idb';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   addCalendarDays,
   isLocalDate,
@@ -27,11 +27,7 @@ import {
 const date = new Date(2024, 1, 29, 12);
 const day = toLocalDate(date);
 const now = toIsoInstant(date);
-const preferences = {
-  appearance: 'system',
-  theme: 'emerald',
-  language: 'en',
-} as const;
+
 const task: Task = {
   id: 'task',
   title: 'Read',
@@ -77,6 +73,133 @@ describe('workspace repositories', () => {
   });
 
   afterEach(() => db.close());
+
+  it('upgrades a v3 workspace without dropping records or overwriting legacy appearance', async () => {
+    const legacy = await openDB(name, 3, {
+      upgrade(database) {
+        for (const store of [
+          'tasks',
+          'habits',
+          'schedules',
+          'completions',
+          'sessions',
+          'settings',
+          'cycle',
+          'activeSession',
+        ]) {
+          const records = database.createObjectStore(store, { keyPath: 'id' });
+          if (store === 'completions')
+            records.createIndex('byOccurrence', ['habitId', 'scheduledDate'], {
+              unique: true,
+            });
+          if (store === 'schedules') records.createIndex('byHabit', 'habitId');
+        }
+      },
+    });
+    await legacy.add('tasks', task);
+    legacy.close();
+    const preference = {
+      appearance: 'dark',
+      theme: 'indigo',
+      language: 'ar',
+    } as const;
+    db = new WorkspaceDatabase(name, undefined, () => preference);
+    repositories = new WorkspaceRepository(db);
+    expect(await repositories.readMetadata()).toMatchObject({
+      generation: 0,
+      preferences: preference,
+    });
+    expect(await repositories.tasks.list()).toEqual([task]);
+    db.close();
+    db = new WorkspaceDatabase(name);
+    repositories = new WorkspaceRepository(db);
+    expect(await repositories.readMetadata()).toMatchObject({
+      preferences: preference,
+    });
+  });
+
+  it('keeps the original workspace on invalid input or a preference write failure, then restores or clears all stores', async () => {
+    await repositories.tasks.add(task);
+    await repositories.sessions.saveIfAbsent(session);
+    await repositories.settings.save({ ...defaultFocusSettings, dailyGoal: 8 });
+    await repositories.cycle.save({
+      id: 'cycle',
+      completedFocusSessions: 2,
+      pendingBreak: 'long',
+    });
+    const before = await repositories.snapshot(now);
+    const decoded = decodeBackup(encodeBackup(before));
+    if (!decoded.ok) throw new Error(decoded.reason);
+    const replacement = {
+      ...decoded.backup,
+      tasks: [{ ...task, title: 'Restored' }],
+      sessions: [],
+    };
+    await expect(
+      repositories.replaceWorkspace({ ...replacement, tasks: [task, task] }),
+    ).rejects.toThrow('Invalid backup');
+    expect(
+      decodeBackup(
+        JSON.stringify({
+          ...replacement,
+          tasks: [
+            {
+              ...task,
+              status: 'completed',
+              completedAt: '2026-02-30T00:00:00.000Z',
+            },
+          ],
+        }),
+      ),
+    ).toEqual({ ok: false, reason: 'invalid-data' });
+    const fail = vi
+      .spyOn(IDBObjectStore.prototype, 'put')
+      .mockImplementationOnce(() => {
+        throw new DOMException('Metadata unavailable', 'QuotaExceededError');
+      });
+    try {
+      await expect(
+        repositories.replaceWorkspace(replacement),
+      ).rejects.toMatchObject({ name: 'QuotaExceededError' });
+    } finally {
+      fail.mockRestore();
+    }
+    expect(await repositories.snapshot(now)).toEqual(before);
+    expect(
+      (await repositories.focusSnapshot()).cycle?.completedFocusSessions,
+    ).toBe(2);
+
+    await repositories.replaceWorkspace(replacement);
+    expect(await repositories.snapshot(now)).toEqual(replacement);
+    expect((await repositories.focusSnapshot()).cycle).toBeUndefined();
+    await repositories.replaceWorkspace(null);
+    expect(await repositories.snapshot(now)).toMatchObject({
+      tasks: [],
+      habits: [],
+      schedules: [],
+      completions: [],
+      sessions: [],
+      settings: { workspace: null },
+    });
+  });
+
+  it('invalidates an idle timer command across both import and clear, even without notification', async () => {
+    const snapshot = await repositories.snapshot(now);
+    for (const backup of [snapshot, null]) {
+      const expected = await repositories.focusSnapshot();
+      const replacement = await repositories.replaceWorkspace(backup);
+      expect(replacement.generation).toBe(expected.metadata.generation + 1);
+      expect(
+        await repositories.updateFocus(
+          expected,
+          () => {
+            throw new Error('Stale timer command reached the transition');
+          },
+          'start',
+        ),
+      ).toMatchObject({ result: 'conflict' });
+    }
+  });
 
   it('resolves a live task on start and freezes its latest title on the saved session', async () => {
     const wall = date.getTime();
@@ -147,13 +270,13 @@ describe('workspace repositories', () => {
     );
     await repositories.tasks.softDelete(task.id, now);
     await expect(begin()).rejects.toBeInstanceOf(UnavailableFocusTaskError);
-    const backup = await repositories.snapshot(preferences, now);
+    const backup = await repositories.snapshot(now);
     expect(backup.sessions[0]?.taskTitleSnapshot).toBe('Before save');
     expect(decodeBackup(encodeBackup(backup))).toMatchObject({ ok: true });
   });
 
   it('rejects invalid settings in backups and repairs legacy stored break limits on the next successful focus write', async () => {
-    const snapshot = await repositories.snapshot(preferences, now);
+    const snapshot = await repositories.snapshot(now);
     const bad = {
       ...defaultFocusSettings,
       shortBreakDurationMinutes: Number.MAX_SAFE_INTEGER,
@@ -298,7 +421,7 @@ describe('workspace repositories', () => {
     await legacy.add('tasks', task);
     await legacy.add('completions', completion);
     legacy.close();
-    expect((await db.open()).version).toBe(3);
+    expect((await db.open()).version).toBe(4);
     expect(await repositories.tasks.get(task.id)).toEqual(task);
     expect(
       await repositories.completions.getOccurrence(completion.habitId, day),
@@ -325,7 +448,7 @@ describe('workspace repositories', () => {
   it('round-trips a backup snapshot and rejects malformed or duplicate data without writes', async () => {
     await repositories.tasks.add(task);
     await repositories.completions.add(completion);
-    const snapshot = await repositories.snapshot(preferences, now);
+    const snapshot = await repositories.snapshot(now);
     expect(decodeBackup(encodeBackup(snapshot))).toEqual({
       ok: true,
       backup: snapshot,
@@ -351,7 +474,7 @@ describe('workspace repositories', () => {
         }),
       ),
     ).toEqual({ ok: false, reason: 'invalid-data' });
-    expect(await repositories.snapshot(preferences, now)).toEqual(snapshot);
+    expect(await repositories.snapshot(now)).toEqual(snapshot);
   });
 
   it('reports corrupted stored records without silently filtering or deleting them', async () => {

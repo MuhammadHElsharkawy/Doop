@@ -1,4 +1,5 @@
 import type { IsoInstant, LocalDate } from '../clock/local-date';
+import type { Preferences } from '../preferences/preferences.service';
 
 interface HistoricalRecord {
   id: string;
@@ -103,6 +104,13 @@ export interface WorkspaceSettings {
   ambientVolume: number;
 }
 
+export interface WorkspaceMetadata {
+  id: 'workspace';
+  generation: number;
+  revision: number;
+  preferences: Preferences | null;
+}
+
 export interface WorkspaceRecords {
   tasks: Task;
   habits: Habit;
@@ -112,4 +120,5 @@ export interface WorkspaceRecords {
   activeSession: ActiveSession;
   cycle: PomodoroCycle;
   settings: WorkspaceSettings;
+  metadata: WorkspaceMetadata;
 }

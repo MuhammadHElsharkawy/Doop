@@ -19,7 +19,9 @@ import { IconComponent } from './icon.component';
     <dialog
       #panel
       [attr.aria-label]="heading()"
+      [attr.aria-describedby]="descriptionId() || null"
       [class.full-height-sheet]="fullHeightSheet()"
+      [class.sticky-header]="stickyHeader()"
       (close)="restoreFocus()"
       (cancel)="onCancel($event)"
     >
@@ -44,8 +46,10 @@ import { IconComponent } from './icon.component';
 export class DialogComponent {
   readonly heading = input.required<string>();
   readonly closeLabel = input.required<string>();
+  readonly descriptionId = input('');
   readonly busy = input(false);
   readonly fullHeightSheet = input(false);
+  readonly stickyHeader = input(false);
   readonly closed = output<void>();
   private readonly panel =
     viewChild.required<ElementRef<HTMLDialogElement>>('panel');

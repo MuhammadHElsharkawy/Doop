@@ -47,11 +47,7 @@ const schedule: HabitSchedule = {
   effectiveTo: null,
   createdAt: now,
 };
-const prefs = {
-  appearance: 'system',
-  theme: 'emerald',
-  language: 'en',
-} as const;
+
 let name: string;
 let db: WorkspaceDatabase;
 let repo: WorkspaceRepository;
@@ -122,7 +118,7 @@ it('rejects orphan, overlapping, and deleted-habit schedule writes and preserves
       effectiveFrom: date('2024-06-01'),
     }),
   ).rejects.toMatchObject({ name: 'ConstraintError' });
-  const snapshot = await repo.snapshot(prefs, now);
+  const snapshot = await repo.snapshot(now);
   expect(decodeBackup(encodeBackup(snapshot))).toEqual({
     ok: true,
     backup: snapshot,
@@ -204,7 +200,7 @@ it('upgrades v2 databases and v1 backups without guessing legacy deletion dates'
   await legacy.add('schedules', schedule);
   legacy.close();
 
-  expect((await db.open()).version).toBe(3);
+  expect((await db.open()).version).toBe(4);
   expect(await repo.habits.get('live')).toMatchObject({
     deletedLocalDate: null,
   });
@@ -213,7 +209,7 @@ it('upgrades v2 databases and v1 backups without guessing legacy deletion dates'
   expect(tombstone).toEqual({ ...old, deletedLocalDate: 'unknown' });
   expect(habitActivityOn(tombstone, date('2024-05-31'))).toBe('unknown');
   expect(await repo.schedules.list()).toEqual([schedule]);
-  const snapshot = await repo.snapshot(prefs, now);
+  const snapshot = await repo.snapshot(now);
   const restored = decodeBackup(
     JSON.stringify({
       ...snapshot,
@@ -298,7 +294,7 @@ const timer: FocusSession = {
 };
 
 it('validates elapsed time consistently on repository writes and backup decode', async () => {
-  const snapshot = await repo.snapshot(prefs, now);
+  const snapshot = await repo.snapshot(now);
   const stopwatch = {
     ...timer,
     id: 'watch',
@@ -357,8 +353,15 @@ it('validates elapsed time consistently on repository writes and backup decode',
 });
 
 it('caps multibyte backup input by UTF-8 bytes before parsing', () => {
-  expect(decodeBackup('\u00e9'.repeat(5 * 1024 * 1024 + 1))).toEqual({
+  expect(decodeBackup('\u00e9'.repeat(32 * 1024 * 1024 + 1))).toEqual({
     ok: false,
     reason: 'too-large',
+  });
+});
+
+it('rejects excessive JSON nesting before decoding records', () => {
+  expect(decodeBackup('['.repeat(17) + '0' + ']'.repeat(17))).toEqual({
+    ok: false,
+    reason: 'resource-limit',
   });
 });

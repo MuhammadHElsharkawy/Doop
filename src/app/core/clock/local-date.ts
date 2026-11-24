@@ -24,12 +24,20 @@ export function isIsoInstant(value: unknown): value is IsoInstant {
 }
 
 export function toLocalDate(date: Date): LocalDate {
-  const year = String(date.getFullYear()).padStart(4, '0');
+  const value = projectLocalDate(date);
+  if (value === undefined) throw new RangeError('Invalid local date');
+  return value;
+}
+
+export function projectLocalDate(date: Date): LocalDate | undefined {
+  const localYear = date.getFullYear();
+  if (!Number.isInteger(localYear) || localYear < 0 || localYear > 9999)
+    return undefined;
+  const year = String(localYear).padStart(4, '0');
   const month = String(date.getMonth() + 1).padStart(2, '0');
   const day = String(date.getDate()).padStart(2, '0');
   const value = [year, month, day].join('-');
-  if (!isLocalDate(value)) throw new RangeError('Invalid local date');
-  return value;
+  return isLocalDate(value) ? value : undefined;
 }
 
 export function toIsoInstant(date: Date): IsoInstant {

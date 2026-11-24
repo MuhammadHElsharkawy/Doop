@@ -21,8 +21,11 @@ import type {
   Task,
   WorkspaceRecords,
 } from '../domain/workspace-records';
-import type { Preferences } from '../preferences/preferences.service';
-import type { BackupV2 } from './backup';
+import {
+  defaultPreferences,
+  type Preferences,
+} from '../preferences/preferences.service';
+import { assertValidBackup, type BackupV2 } from './backup';
 import {
   InvalidActiveSessionError,
   InvalidRecordError,
@@ -581,6 +584,7 @@ export function sameFocusRevision(
 export class UnavailableFocusTaskError extends Error {}
 
 interface FocusSnapshot {
+  metadata: WorkspaceRecords['metadata'];
   active: ActiveSession | undefined;
   cycle: PomodoroCycle | undefined;
   settings: WorkspaceRecords['settings'] | undefined;
@@ -607,6 +611,61 @@ export class WorkspaceRepository {
   readonly cycle;
   readonly settings;
 
+  readMetadata() {
+    return this.database.run(
+      ['metadata'],
+      'readonly',
+      async (tx) =>
+        verify('metadata', await tx.objectStore('metadata').get('workspace')),
+      'workspace:metadata',
+    );
+  }
+
+  writePreferences(
+    change: (current: Preferences) => Preferences,
+    generation?: number,
+  ) {
+    return this.database.run(
+      ['metadata'],
+      'readwrite',
+      async (tx) => {
+        const store = tx.objectStore('metadata');
+        const current = verify('metadata', await store.get('workspace'));
+        if (generation !== undefined && generation !== current.generation)
+          return current;
+        const preferences = change(current.preferences ?? defaultPreferences);
+        const metadata = verify('metadata', {
+          ...current,
+          revision: current.revision + 1,
+          preferences,
+        });
+        await store.put(metadata);
+        return metadata;
+      },
+      'workspace:preferences',
+    );
+  }
+
+  initializePreferences(preferences: Preferences) {
+    return this.database.run(
+      ['metadata'],
+      'readwrite',
+      async (tx) => {
+        const store = tx.objectStore('metadata');
+        const current = verify('metadata', await store.get('workspace'));
+        if (current.preferences) return current;
+        const metadata = verify('metadata', {
+          ...current,
+          revision: current.revision + 1,
+          preferences,
+        });
+        await store.put(metadata);
+        return metadata;
+      },
+      'workspace:initializePreferences',
+    );
+  }
+
   readFocusSettings() {
     return this.database.run(
       ['settings'],
@@ -621,15 +680,17 @@ export class WorkspaceRepository {
 
   focusSnapshot() {
     return this.database.run(
-      ['activeSession', 'cycle', 'settings'],
+      ['activeSession', 'cycle', 'settings', 'metadata'],
       'readonly',
       async (tx) => {
-        const [active, cycle, settings] = await Promise.all([
+        const [active, cycle, settings, metadata] = await Promise.all([
           tx.objectStore('activeSession').get('active'),
           tx.objectStore('cycle').get('cycle'),
           tx.objectStore('settings').get('settings'),
+          tx.objectStore('metadata').get('workspace'),
         ]);
         return {
+          metadata: verify('metadata', metadata),
           active:
             active === undefined ? undefined : verify('activeSession', active),
           cycle: cycle === undefined ? undefined : verify('cycle', cycle),
@@ -644,7 +705,7 @@ export class WorkspaceRepository {
   }
 
   updateFocus(
-    expected: Pick<FocusSnapshot, 'active' | 'cycle'>,
+    expected: Pick<FocusSnapshot, 'active' | 'cycle' | 'metadata'>,
     transition: (
       snapshot: FocusSnapshot,
       task?: Pick<ActiveSession, 'taskId' | 'taskTitleSnapshot'>,
@@ -659,7 +720,7 @@ export class WorkspaceRepository {
     startTaskId?: string,
   ) {
     return this.database.run(
-      ['activeSession', 'sessions', 'cycle', 'settings', 'tasks'],
+      ['activeSession', 'sessions', 'cycle', 'settings', 'tasks', 'metadata'],
       'readwrite',
       async (tx) => {
         const activeStore = tx.objectStore('activeSession');
@@ -675,8 +736,13 @@ export class WorkspaceRepository {
           storedSettings === undefined
             ? undefined
             : recoverLegacySettings(storedSettings);
-        const snapshot = { active, cycle, settings };
+        const metadata = verify(
+          'metadata',
+          await tx.objectStore('metadata').get('workspace'),
+        );
+        const snapshot = { active, cycle, settings, metadata };
         if (
+          expected.metadata.generation !== metadata.generation ||
           !sameFocusRevision(expected.active, active) ||
           !sameCycle(expected.cycle, cycle)
         )
@@ -738,6 +804,7 @@ export class WorkspaceRepository {
           active: next.active ?? undefined,
           cycle: next.cycle ?? cycle,
           settings,
+          metadata,
           historyChanged: next.completion !== undefined,
           result: 'committed' as const,
         };
@@ -750,11 +817,18 @@ export class WorkspaceRepository {
     change: (
       current: WorkspaceRecords['settings'] | undefined,
     ) => WorkspaceRecords['settings'],
+    generation?: number,
   ) {
     return this.database.run(
-      ['settings'],
+      ['settings', 'metadata'],
       'readwrite',
       async (tx) => {
+        const metadata = verify(
+          'metadata',
+          await tx.objectStore('metadata').get('workspace'),
+        );
+        if (generation !== undefined && generation !== metadata.generation)
+          throw new DOMException('Workspace was replaced', 'ConstraintError');
         const store = tx.objectStore('settings');
         const existing = await store.get('settings');
         const next = verify(
@@ -783,23 +857,36 @@ export class WorkspaceRepository {
     this.settings = new WritableRecords(database, 'settings');
   }
 
-  snapshot(
-    preferences: Preferences,
-    exportedAt: IsoInstant,
-  ): Promise<BackupV2> {
+  snapshot(exportedAt: IsoInstant): Promise<BackupV2> {
     return this.database.run(
-      ['tasks', 'habits', 'schedules', 'completions', 'sessions', 'settings'],
+      [
+        'tasks',
+        'habits',
+        'schedules',
+        'completions',
+        'sessions',
+        'settings',
+        'metadata',
+      ],
       'readonly',
       async (tx) => {
-        const [tasks, habits, schedules, completions, sessions, settings] =
-          await Promise.all([
-            tx.objectStore('tasks').getAll(),
-            tx.objectStore('habits').getAll(),
-            tx.objectStore('schedules').getAll(),
-            tx.objectStore('completions').getAll(),
-            tx.objectStore('sessions').getAll(),
-            tx.objectStore('settings').get('settings'),
-          ]);
+        const [
+          tasks,
+          habits,
+          schedules,
+          completions,
+          sessions,
+          settings,
+          metadata,
+        ] = await Promise.all([
+          tx.objectStore('tasks').getAll(),
+          tx.objectStore('habits').getAll(),
+          tx.objectStore('schedules').getAll(),
+          tx.objectStore('completions').getAll(),
+          tx.objectStore('sessions').getAll(),
+          tx.objectStore('settings').get('settings'),
+          tx.objectStore('metadata').get('workspace'),
+        ]);
         return {
           format: 'doop-backup',
           version: 2,
@@ -810,13 +897,160 @@ export class WorkspaceRepository {
           completions: completions.map((value) => verify('completions', value)),
           sessions: sessions.map((value) => verify('sessions', value)),
           settings: {
-            preferences,
+            preferences:
+              verify('metadata', metadata).preferences ?? defaultPreferences,
             workspace:
-              settings === undefined ? null : verify('settings', settings),
+              settings === undefined ? null : recoverLegacySettings(settings),
           },
         };
       },
       'backup:snapshot',
+    );
+  }
+
+  readProgress() {
+    return this.database.run(
+      ['tasks', 'habits', 'schedules', 'completions', 'sessions'],
+      'readonly',
+      async (tx) => {
+        const [tasks, habits, schedules, completions, sessions] =
+          await Promise.all([
+            tx.objectStore('tasks').getAll(),
+            tx.objectStore('habits').getAll(),
+            tx.objectStore('schedules').getAll(),
+            tx.objectStore('completions').getAll(),
+            tx.objectStore('sessions').getAll(),
+          ]);
+        const rows = {
+          tasks: tasks.map((row) => verify('tasks', row)),
+          habits: habits.map((row) => verify('habits', row)),
+          schedules: schedules.map((row) => verify('schedules', row)),
+          completions: completions.map((row) => verify('completions', row)),
+          sessions: sessions.map((row) => verify('sessions', row)),
+        };
+        if (!validScheduleHistory(rows.habits, rows.schedules))
+          throw new InvalidRecordError('Invalid habit schedule history');
+        return rows;
+      },
+      'progress:read',
+    );
+  }
+
+  exportBackup(exportedAt: IsoInstant): Promise<Blob> {
+    const collections = [
+      'tasks',
+      'habits',
+      'schedules',
+      'completions',
+      'sessions',
+    ] as const;
+    return this.database.run(
+      [...collections, 'settings', 'metadata'],
+      'readonly',
+      async (tx) => {
+        const parts: Blob[] = [];
+        let chunk = '';
+        const append = (value: string) => {
+          if (chunk.length + value.length > 256 * 1024 && chunk) {
+            parts.push(new Blob([chunk]));
+            chunk = '';
+          }
+          if (value.length > 256 * 1024) parts.push(new Blob([value]));
+          else chunk += value;
+        };
+        const habits: Pick<Habit, 'id'>[] = [];
+        const schedules: HabitSchedule[] = [];
+        append(
+          '{"format":"doop-backup","version":2,"exportedAt":' +
+            JSON.stringify(exportedAt),
+        );
+        for (const name of collections) {
+          append(',' + JSON.stringify(name) + ':[');
+          let separator = '';
+          for (
+            let cursor = await tx.objectStore(name).openCursor();
+            cursor;
+            cursor = await cursor.continue()
+          ) {
+            const row = verify(name, cursor.value);
+            if (name === 'habits') habits.push({ id: row.id });
+            if (name === 'schedules') schedules.push(verify('schedules', row));
+            append(separator);
+            append(JSON.stringify(row));
+            separator = ',';
+          }
+          append(']');
+        }
+        if (!validScheduleHistory(habits, schedules))
+          throw new InvalidRecordError('Invalid habit schedule history');
+        const metadata = verify(
+          'metadata',
+          await tx.objectStore('metadata').get('workspace'),
+        );
+        const settings = await tx.objectStore('settings').get('settings');
+        append(
+          ',"settings":' +
+            JSON.stringify({
+              preferences: metadata.preferences ?? defaultPreferences,
+              workspace:
+                settings === undefined ? null : recoverLegacySettings(settings),
+            }) +
+            '}',
+        );
+        if (chunk) parts.push(new Blob([chunk]));
+        return new Blob(parts, { type: 'application/json' });
+      },
+      'backup:export',
+    );
+  }
+
+  async replaceWorkspace(
+    backup: BackupV2 | null,
+  ): Promise<WorkspaceRecords['metadata']> {
+    if (backup) assertValidBackup(backup);
+    const stores: Store[] = [
+      'tasks',
+      'habits',
+      'schedules',
+      'completions',
+      'sessions',
+      'settings',
+      'cycle',
+      'activeSession',
+    ];
+    return this.database.run(
+      [...stores, 'metadata'],
+      'readwrite',
+      async (tx) => {
+        await Promise.all(stores.map((name) => tx.objectStore(name).clear()));
+        if (backup) {
+          const { tasks, habits, schedules, completions, sessions, settings } =
+            backup;
+          await Promise.all([
+            ...tasks.map((row) => tx.objectStore('tasks').add(row)),
+            ...habits.map((row) => tx.objectStore('habits').add(row)),
+            ...schedules.map((row) => tx.objectStore('schedules').add(row)),
+            ...completions.map((row) => tx.objectStore('completions').add(row)),
+            ...sessions.map((row) => tx.objectStore('sessions').add(row)),
+            settings.workspace &&
+              tx.objectStore('settings').add(settings.workspace),
+          ]);
+        }
+        const metadataStore = tx.objectStore('metadata');
+        const previous = verify(
+          'metadata',
+          await metadataStore.get('workspace'),
+        );
+        const metadata = verify('metadata', {
+          ...previous,
+          generation: previous.generation + 1,
+          revision: previous.revision + 1,
+          preferences: backup?.settings.preferences ?? defaultPreferences,
+        });
+        await metadataStore.put(metadata);
+        return metadata;
+      },
+      'backup:replace',
     );
   }
 }

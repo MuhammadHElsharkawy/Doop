@@ -170,7 +170,9 @@
         </button>
       }
     </div>
-    @if (timer.changedElsewhere()) {
+    @if (timer.workspaceChanged()) {
+      <p class="mt-4 text-muted" role="status">{{ text().workspaceChanged }}</p>
+    } @else if (timer.changedElsewhere()) {
       <p class="mt-4 text-muted" role="status">{{ text().conflict }}</p>
     }
     @if (phase === 'idle' && timer.taskUnavailable()) {
